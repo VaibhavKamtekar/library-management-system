@@ -19,6 +19,73 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+function buildVisitLogFilters(query) {
+  const {
+    visit_date,
+    visitor_type,
+    search,
+    department,
+    use_computer,
+    status
+  } = query;
+
+  const baseQuery = `
+    FROM library_logs ll
+    LEFT JOIN students s
+      ON ll.visitor_type = 'student'
+      AND ll.roll_no = s.roll_no
+    WHERE 1 = 1
+  `;
+
+  let whereClause = "";
+  const params = [];
+  const hasExplicitVisitDate =
+    typeof query.visit_date === "string" && query.visit_date.trim() !== "";
+
+  // For "currently inside" queries, date should only be applied when the client
+  // explicitly sends one. This keeps the logs aligned with the active-session count.
+  if (hasExplicitVisitDate) {
+    whereClause += " AND ll.visit_date = ?";
+    params.push(visit_date);
+  }
+
+  if (visitor_type && visitor_type !== "all") {
+    whereClause += " AND ll.visitor_type = ?";
+    params.push(visitor_type);
+  }
+
+  if (department && department !== "all") {
+    whereClause += " AND s.department = ?";
+    params.push(department);
+  }
+
+  if (use_computer && use_computer !== "all") {
+    whereClause += " AND ll.use_computer = ?";
+    params.push(use_computer);
+  }
+
+  if (status === "inside") {
+    whereClause += " AND ll.exit_time IS NULL";
+  }
+
+  if (status === "exited") {
+    whereClause += " AND ll.exit_time IS NOT NULL";
+  }
+
+  if (search) {
+    whereClause += " AND (ll.visitor_name LIKE ? OR ll.roll_no LIKE ?)";
+    params.push(`%${search}%`, `%${search}%`);
+  }
+
+  return { baseQuery, whereClause, params };
+}
+
+function toCsvValue(value) {
+  if (value === null || value === undefined) return "";
+  const stringValue = String(value).replace(/"/g, '""');
+  return `"${stringValue}"`;
+}
+
 /* =========================
    ADMIN LOGIN
 ========================= */
@@ -186,6 +253,145 @@ router.get("/peak-hour", (req, res) => {
     if (err) return res.status(500).json(err);
     res.json(result[0]);
   });
+});
+
+/* =========================
+   CURRENTLY INSIDE USERS
+========================= */
+router.get("/currently-inside", async (req, res) => {
+  try {
+    const dbPromise = db.promise();
+    const [rows] = await dbPromise.query(`
+      SELECT COUNT(*) AS count
+      FROM library_logs
+      WHERE exit_time IS NULL
+    `);
+
+    return res.json({
+      count: rows[0]?.count || 0
+    });
+  } catch (error) {
+    return res.status(500).json({
+      message: "Unable to load currently inside count."
+    });
+  }
+});
+
+/* =========================
+   FILTERED VISIT LOGS
+========================= */
+router.get("/visit-logs", (req, res) => {
+  const {
+    status,
+    page = 1,
+    limit = 10
+  } = req.query;
+
+  const currentPage = Math.max(parseInt(page, 10) || 1, 1);
+  const pageSize = Math.max(parseInt(limit, 10) || 10, 1);
+  const offset = (currentPage - 1) * pageSize;
+  const { baseQuery, whereClause, params } = buildVisitLogFilters(req.query);
+
+  const countQuery = `
+    SELECT COUNT(*) AS total
+    ${baseQuery}
+    ${whereClause}
+  `;
+
+  const dataQuery = `
+    SELECT
+      ll.log_id,
+      ll.visitor_type,
+      ll.visitor_name,
+      ll.roll_no,
+      s.department,
+      ll.entry_time,
+      ll.exit_time,
+      ll.visit_date,
+      ll.use_computer,
+      CASE
+        WHEN ll.exit_time IS NULL THEN 'Inside'
+        ELSE 'Exited'
+      END AS status
+    ${baseQuery}
+    ${whereClause}
+    ORDER BY ll.entry_time DESC
+    LIMIT ? OFFSET ?
+  `;
+
+  db.query(countQuery, params, (countErr, countResult) => {
+    if (countErr) return res.status(500).json(countErr);
+
+    const total = countResult[0]?.total || 0;
+    const totalPages = Math.max(Math.ceil(total / pageSize), 1);
+
+    db.query(dataQuery, [...params, pageSize, offset], (err, result) => {
+      if (err) return res.status(500).json(err);
+      res.json({
+        data: result,
+        total,
+        page: currentPage,
+        totalPages
+      });
+    });
+  });
+});
+
+/* =========================
+   EXPORT FILTERED VISIT LOGS AS CSV
+========================= */
+router.get("/export-logs", async (req, res) => {
+  try {
+    const dbPromise = db.promise();
+    const { baseQuery, whereClause, params } = buildVisitLogFilters(req.query);
+    const exportQuery = `
+      SELECT
+        ll.visitor_type,
+        ll.visitor_name,
+        ll.roll_no,
+        ll.entry_time,
+        ll.exit_time,
+        ll.visit_date,
+        ll.use_computer
+      ${baseQuery}
+      ${whereClause}
+      ORDER BY ll.entry_time DESC
+    `;
+
+    const [rows] = await dbPromise.query(exportQuery, params);
+    const headers = [
+      "visitor_type",
+      "visitor_name",
+      "roll_no",
+      "entry_time",
+      "exit_time",
+      "visit_date",
+      "use_computer"
+    ];
+
+    const csvLines = [
+      headers.join(","),
+      ...rows.map((row) =>
+        headers
+          .map((header) =>
+            toCsvValue(
+              header === "exit_time" && row[header] === null
+                ? "Still Inside"
+                : row[header]
+            )
+          )
+          .join(",")
+      )
+    ];
+
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", 'attachment; filename="library_logs.csv"');
+    return res.status(200).send(csvLines.join("\n"));
+  } catch (error) {
+    return res.status(500).json({
+      message: "Unable to export visit logs."
+    });
+  }
 });
 
 /* =========================

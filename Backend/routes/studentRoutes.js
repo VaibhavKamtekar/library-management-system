@@ -2,21 +2,26 @@ const router = require("express").Router();
 const db = require("../db");
 
 router.post("/in", (req, res) => {
-  const { name, roll_no, use_computer } = req.body;
+  const { roll_no, use_computer } = req.body;
 
   db.query(
-    "SELECT * FROM students WHERE roll_no=?",
+    "SELECT name, department FROM students WHERE roll_no=?",
     [roll_no],
     (err, result) => {
+      if (err) return res.status(500).json(err);
+
       if (result.length === 0)
-        return res.json({ message: "Student not found" });
+        return res.status(404).json({ message: "Student not found" });
 
       db.query(
         `INSERT INTO library_logs 
          (visitor_type, visitor_name, roll_no, entry_time, visit_date, use_computer)
          VALUES ('student', ?, ?, NOW(), CURDATE(), ?)`,
-        [name, roll_no, use_computer || "NO"],
-        () => res.json({ message: "Student IN recorded" })
+        [result[0].name, roll_no, use_computer || "NO"],
+        (insertErr) => {
+          if (insertErr) return res.status(500).json(insertErr);
+          return res.json({ message: "Student IN recorded" });
+        }
       );
     }
   );
@@ -25,7 +30,7 @@ router.post("/validate", (req, res) => {
   const { roll_no } = req.body;
 
   db.query(
-    "SELECT department FROM students WHERE roll_no=?",
+    "SELECT name, department FROM students WHERE roll_no=?",
     [roll_no],
     (err, result) => {
       if (err) return res.status(500).json(err);
@@ -35,6 +40,7 @@ router.post("/validate", (req, res) => {
       }
 
       res.json({
+        name: result[0].name,
         department: result[0].department
       });
     }
@@ -49,7 +55,10 @@ router.post("/out", (req, res) => {
      SET exit_time = NOW()
      WHERE roll_no=? AND exit_time IS NULL`,
     [roll_no],
-    () => res.json({ message: "Student OUT recorded" })
+    (err) => {
+      if (err) return res.status(500).json(err);
+      return res.json({ message: "Student OUT recorded" });
+    }
   );
 });
 router.get("/leaderboard", (req, res) => {

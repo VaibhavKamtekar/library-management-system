@@ -1,85 +1,61 @@
-import { Container, Paper, Typography, Box } from "@mui/material";
 import { useEffect } from "react";
+import {
+  Box,
+  Paper,
+  Stack,
+  Typography
+} from "@mui/material";
+import OperationalLayout from "./OperationalLayout";
 
-export default function Message({ message, user, setScreen }) {
+export default function Message({ message, user, setScreen, mode, onToggleMode }) {
   useEffect(() => {
     const timer = setTimeout(() => {
       setScreen("home");
-    }, 3000); // 3 seconds
+    }, 3000);
 
     return () => clearTimeout(timer);
   }, [setScreen]);
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8 }}>
-      <Paper
-        elevation={10}
-        sx={{
-          p: 5,
-          textAlign: "center",
-          borderRadius: 4,
-          background: "linear-gradient(135deg, #fdfbfb, #ebedee)"
-        }}
-      >
-        {/* Welcome Heading */}
-        <Typography
-          variant="h5"
-          sx={{ fontWeight: "bold", color: "#1a237e", mb: 2 }}
-        >
-          📚 Welcome to NMITD Library
-        </Typography>
-
-        {/* Common Message (IN / OUT response) */}
-        <Typography variant="body1" sx={{ mb: 2 }}>
-          {message}
-        </Typography>
-
-        {/* USER DETAILS */}
-        <Box sx={{ mt: 2 }}>
-          {/* STUDENT */}
-          {user.type === "student" && (
-            <>
-              <Typography>
-                <strong>Name:</strong> {user.name}
-              </Typography>
-              <Typography>
-                <strong>Roll No:</strong> {user.rollNo}
-              </Typography>
-              <Typography>
-                <strong>Department:</strong> {user.department}
-              </Typography>
-            </>
-          )}
-
-          {/* STAFF */}
-          {user.type === "staff" && (
-            <>
-              <Typography>
-                <strong>Name:</strong> {user.name}
-              </Typography>
-              <Typography>
-                {/* <strong>Department:</strong> {user.department} */}
-              </Typography>
-            </>
-          )}
-
-          {/* GUEST */}
-          {user.type === "guest" && (
-            <Typography>
-              <strong>Name:</strong> {user.name}
+    <OperationalLayout
+      title="Visit status"
+      subtitle="The request has been processed. This screen will return to the home page automatically."
+      sectionLabel="Confirmation"
+      mode={mode}
+      onToggleMode={onToggleMode}
+    >
+      <Paper sx={paperSx}>
+        <Stack spacing={2}>
+          <Typography variant="h6" sx={{ color: "#17314d", fontWeight: 700 }}>
+            {message}
+          </Typography>
+          {user.name && <InfoRow label="Name" value={user.name} />}
+          {user.rollNo && <InfoRow label="Roll Number" value={user.rollNo} />}
+          {user.department && <InfoRow label="Department" value={user.department} />}
+          {user.type && <InfoRow label="Visitor Type" value={user.type} />}
+          <Box sx={{ pt: 1 }}>
+            <Typography sx={{ color: "#60758d" }}>
+              Returning to the home page in 3 seconds.
             </Typography>
-          )}
-        </Box>
-
-        {/* Redirect Info */}
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ display: "block", mt: 3 }}
-        >
-          Redirecting to Home...
-        </Typography>
+          </Box>
+        </Stack>
       </Paper>
-    </Container>
+    </OperationalLayout>
   );
 }
+
+function InfoRow({ label, value }) {
+  return (
+    <Typography sx={{ color: "#435a74" }}>
+      <strong>{label}:</strong> {value}
+    </Typography>
+  );
+}
+
+const paperSx = {
+  p: { xs: 3, md: 4 },
+  borderRadius: 4,
+  border: "1px solid",
+  borderColor: "divider",
+  background: (theme) => (theme.palette.mode === "dark" ? "#16243a" : "#ffffff")
+};

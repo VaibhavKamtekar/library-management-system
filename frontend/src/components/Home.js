@@ -1,149 +1,76 @@
 import {
+  Box,
   Button,
-  Container,
   Paper,
-  Typography,
   Stack,
-  Box
+  Typography
 } from "@mui/material";
+import OperationalLayout from "./OperationalLayout";
 
-export default function Home({ setScreen }) {
+export default function Home({ setScreen, mode, onToggleMode }) {
   return (
-    <Box
-      sx={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: "linear-gradient(135deg, #1e3c72, #2a5298)"
-      }}
+    <OperationalLayout
+      title="Library access portal"
+      subtitle="Choose the required workflow to record visitor movement or open the administrative dashboard."
+      sectionLabel="NMITD Library System"
+      maxWidth="sm"
+      mode={mode}
+      onToggleMode={onToggleMode}
     >
-      <Container maxWidth="sm">
-        <Paper
-          elevation={20}
-          sx={{
-            p: 5,
-            textAlign: "center",
-            borderRadius: 4,
-            background: "rgba(255, 255, 255, 0.9)",
-            backdropFilter: "blur(10px)",
-            animation: "fadeIn 0.8s ease-in-out",
-            "@keyframes fadeIn": {
-              from: { opacity: 0, transform: "translateY(20px)" },
-              to: { opacity: 1, transform: "translateY(0)" }
-            }
-          }}
-        >
-          {/* HEADER */}
-          <Box sx={{ mb: 3 }}>
-            <Typography
-              variant="h4"
-              sx={{ fontWeight: "bold", color: "#0d47a1" }}
-            >
-              📚 NMITD Library
-            </Typography>
-            <Typography variant="body1" sx={{ color: "#444", mt: 1 }}>
-              Library Entry Management System
-            </Typography>
-          </Box>
+      <Paper
+        elevation={0}
+        sx={(theme) => ({
+          p: { xs: 3, md: 4 },
+          borderRadius: 4,
+          border: `1px solid ${theme.palette.divider}`,
+          background: theme.palette.mode === "dark" ? "#16243a" : "#ffffff"
+        })}
+      >
+        <Stack spacing={2}>
+          <Button variant="contained" sx={menuButtonSx("#2563eb")} onClick={() => setScreen("student")}>
+            Student Entry
+          </Button>
+          <Button variant="contained" sx={menuButtonSx("#0f766e")} onClick={() => setScreen("staff")}>
+            Staff Entry
+          </Button>
+          <Button variant="contained" sx={menuButtonSx("#7c3aed")} onClick={() => setScreen("guest")}>
+            Guest Entry
+          </Button>
+          <Button variant="outlined" sx={adminButtonSx} onClick={() => setScreen("adminLogin")}>
+            Admin Login
+          </Button>
+        </Stack>
 
-          {/* BUTTONS */}
-          <Stack spacing={2.5}>
-            <Button
-              fullWidth
-              size="large"
-              variant="contained"
-              sx={{
-                background: "linear-gradient(90deg, #1976d2, #42a5f5)",
-                fontWeight: "bold",
-                py: 1.3,
-                borderRadius: 2,
-                boxShadow: "0 6px 15px rgba(25,118,210,0.4)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  transform: "translateY(-3px)",
-                  boxShadow: "0 10px 20px rgba(25,118,210,0.6)"
-                }
-              }}
-              onClick={() => setScreen("student")}
-            >
-              Student Entry
-            </Button>
-
-            <Button
-              fullWidth
-              size="large"
-              variant="contained"
-              sx={{
-                background: "linear-gradient(90deg, #2e7d32, #66bb6a)",
-                fontWeight: "bold",
-                py: 1.3,
-                borderRadius: 2,
-                boxShadow: "0 6px 15px rgba(46,125,50,0.4)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  transform: "translateY(-3px)",
-                  boxShadow: "0 10px 20px rgba(46,125,50,0.6)"
-                }
-              }}
-              onClick={() => setScreen("staff")}
-            >
-              Staff Entry
-            </Button>
-
-            <Button
-              fullWidth
-              size="large"
-              variant="contained"
-              sx={{
-                background: "linear-gradient(90deg, #6a1b9a, #ab47bc)",
-                fontWeight: "bold",
-                py: 1.3,
-                borderRadius: 2,
-                boxShadow: "0 6px 15px rgba(106,27,154,0.4)",
-                transition: "all 0.3s",
-                "&:hover": {
-                  transform: "translateY(-3px)",
-                  boxShadow: "0 10px 20px rgba(106,27,154,0.6)"
-                }
-              }}
-              onClick={() => setScreen("guest")}
-            >
-              Guest Entry
-            </Button>
-
-            <Button
-              fullWidth
-              size="large"
-              variant="outlined"
-              sx={{
-                borderColor: "#d32f2f",
-                color: "#d32f2f",
-                fontWeight: "bold",
-                py: 1.3,
-                borderRadius: 2,
-                transition: "all 0.3s",
-                "&:hover": {
-                  backgroundColor: "#d32f2f",
-                  color: "#fff",
-                  boxShadow: "0 6px 15px rgba(211,47,47,0.5)"
-                }
-              }}
-              onClick={() => setScreen("adminLogin")}
-            >
-              Admin Login
-            </Button>
-          </Stack>
-
-          {/* FOOTER */}
-          <Typography
-            variant="caption"
-            sx={{ display: "block", mt: 4, color: "#555" }}
-          >
-            © NMITD • Library Management System
+        <Box sx={{ mt: 3, pt: 2.5, borderTop: "1px solid #e6edf5" }}>
+          <Typography sx={(theme) => ({ color: theme.palette.text.secondary, textAlign: "center", lineHeight: 1.7 })}>
+            Use the entry workflows for front-desk operations. Use admin only for reports, logs, and student data upload.
           </Typography>
-        </Paper>
-      </Container>
-    </Box>
+        </Box>
+      </Paper>
+    </OperationalLayout>
   );
 }
+
+function menuButtonSx(color) {
+  return {
+    py: 1.45,
+    borderRadius: 3,
+    fontWeight: 700,
+    background: color,
+    "&:hover": {
+      background: color
+    }
+  };
+}
+
+const adminButtonSx = {
+  py: 1.45,
+  borderRadius: 3,
+  fontWeight: 700,
+  borderColor: "divider",
+  color: "text.primary",
+  "&:hover": {
+    borderColor: "primary.main",
+    background: "action.hover"
+  }
+};

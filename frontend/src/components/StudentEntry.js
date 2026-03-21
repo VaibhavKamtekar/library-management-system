@@ -1,76 +1,103 @@
-import { Button, Container, Paper, TextField, Typography, Stack } from "@mui/material";
+import { useState } from "react";
 import axios from "axios";
-export default function StudentEntry({ setScreen, setUser }) {
+import {
+  Alert,
+  Button,
+  Paper,
+  Stack,
+  TextField
+} from "@mui/material";
+import OperationalLayout from "./OperationalLayout";
+
+export default function StudentEntry({ setScreen, setUser, mode, onToggleMode }) {
+  const [error, setError] = useState("");
+
   const handleValidate = async (e) => {
     e.preventDefault();
+    setError("");
 
-    const name = e.target.name.value;
-    const rollNo = e.target.rollNo.value;
+    const rollNo = e.target.rollNo.value.trim();
 
-    if (!name || !rollNo) {
-      alert("Please enter name and roll number");
+    if (!rollNo) {
+      setError("Enter the student roll number.");
       return;
     }
-    try {
-      const res = await axios.post(
-        "http://localhost:5000/api/student/validate",
-        { roll_no: rollNo }
-      );
 
-      // Save student data for next screen
+    try {
+      const res = await axios.post("http://localhost:5000/api/student/validate", {
+        roll_no: rollNo
+      });
+
       setUser({
         type: "student",
-        name: name,
-        rollNo: rollNo,
+        name: res.data.name,
+        rollNo,
         department: res.data.department
       });
 
       setScreen("inout");
     } catch (err) {
-      if (err.response && err.response.status === 404) {
-        alert("Student not found. Please check roll number.");
+      if (err.response?.status === 404) {
+        setError("Student not found. Check the roll number and try again.");
       } else {
-        alert("Server error. Please try again.");
+        setError("Unable to validate student details right now.");
       }
     }
   };
 
   return (
-    <Container maxWidth="sm" sx={{ mt: 8 }}>
-      <Paper elevation={6} sx={{ p: 4 }}>
-        <Typography variant="h6" align="center" gutterBottom>
-          📖 Student Entry
-        </Typography>
-
-        <form onSubmit={handleValidate}>
-          <Stack spacing={2}>
-            <TextField
-              label="Student Name"
-              name="name"
-              fullWidth
-              required
-            />
-
-            <TextField
-              label="Roll Number"
-              name="rollNo"
-              fullWidth
-              required
-            />
-
-            <Button type="submit" variant="contained" color="success">
-              Validate
-            </Button>
-
-            <Button
-              variant="outlined"
-              onClick={() => setScreen("home")}
-            >
-              Back
-            </Button>
-          </Stack>
-        </form>
+    <OperationalLayout
+      title="Student entry"
+      subtitle="Enter the student roll number to validate the record before marking entry or exit."
+      sectionLabel="Student Workflow"
+      mode={mode}
+      onToggleMode={onToggleMode}
+    >
+      <Paper sx={paperSx} component="form" onSubmit={handleValidate}>
+        <Stack spacing={2.5}>
+          <TextField
+            label="Roll Number"
+            name="rollNo"
+            required
+            fullWidth
+            helperText="Student details will be loaded automatically from the database."
+          />
+          {error && <Alert severity="error">{error}</Alert>}
+          <Button type="submit" variant="contained" sx={primaryButtonSx}>
+            Validate Student
+          </Button>
+          <Button variant="outlined" sx={secondaryButtonSx} onClick={() => setScreen("home")}>
+            Back
+          </Button>
+        </Stack>
       </Paper>
-    </Container>
+    </OperationalLayout>
   );
 }
+
+const paperSx = {
+  p: { xs: 3, md: 4 },
+  borderRadius: 4,
+  border: "1px solid",
+  borderColor: "divider",
+  background: (theme) => (theme.palette.mode === "dark" ? "#16243a" : "#ffffff")
+};
+
+const primaryButtonSx = {
+  py: 1.35,
+  borderRadius: 3,
+  fontWeight: 700,
+  background: "#2563eb"
+};
+
+const secondaryButtonSx = {
+  py: 1.35,
+  borderRadius: 3,
+  fontWeight: 700,
+  borderColor: "divider",
+  color: "text.primary",
+  "&:hover": {
+    borderColor: "primary.main",
+    background: "action.hover"
+  }
+};
