@@ -1,0 +1,8 @@
+# Root-level local artifacts
+node_modules/
+tmp/
+.codex-sora-deps/
+
+# Editor and OS files
+.DS_Store
+Thumbs.db
