@@ -46,8 +46,8 @@ export default function AdminLogin({ setScreen, mode, onToggleMode }) {
     >
       <Paper sx={paperSx} component="form" onSubmit={handleLogin}>
         <Stack spacing={2.5}>
-          <TextField label="Username" name="username" required fullWidth />
-          <TextField label="Password" name="password" type="password" required fullWidth />
+          <TextField label="Username" name="username" required fullWidth autoComplete="off"/>
+          <TextField label="Password" name="password" type="password" required fullWidth autoComplete="new-password" />
           {error && <Alert severity="error">{error}</Alert>}
           <Button type="submit" variant="contained" sx={primaryButtonSx}>
             Sign In

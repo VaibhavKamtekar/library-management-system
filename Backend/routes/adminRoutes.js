@@ -159,17 +159,26 @@ router.get("/footfall", (req, res) => {
 
   const query = `
     SELECT
-      COUNT(*) AS total_students,
-      SUM(use_computer='YES') AS computer_users,
-      SUM(use_computer='NO') AS non_computer_users
+      SUM(visitor_type='student') AS total_students,
+      SUM(visitor_type='student' AND use_computer='YES') AS computer_users,
+      SUM(visitor_type='student' AND use_computer='NO') AS non_computer_users,
+      SUM(visitor_type='student') AS students_today,
+      SUM(visitor_type='staff') AS staff_today,
+      SUM(visitor_type='guest') AS guests_today
     FROM library_logs
-    WHERE visitor_type='student'
-    AND visit_date = ?
+    WHERE visit_date = ?
   `;
 
   db.query(query, [today], (err, result) => {
     if (err) return res.status(500).json(err);
-    res.json(result[0]);
+    res.json({
+      total_students: result[0]?.total_students || 0,
+      computer_users: result[0]?.computer_users || 0,
+      non_computer_users: result[0]?.non_computer_users || 0,
+      students_today: result[0]?.students_today || 0,
+      staff_today: result[0]?.staff_today || 0,
+      guests_today: result[0]?.guests_today || 0
+    });
   });
 });
 
