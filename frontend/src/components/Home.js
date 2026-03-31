@@ -51,10 +51,14 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
     { name: "Guests", count: footfall.guests_today }
   ];
   const pieData = [
-    { name: "Students", value: footfall.students_today },
-    { name: "Staff", value: footfall.staff_today },
-    { name: "Guests", value: footfall.guests_today }
+    { name: "Students", value: Number(footfall.students_today ) || 0 },
+    { name: "Staff", value: Number(footfall.staff_today ) || 0 },
+    { name: "Guests", value: Number(footfall.guests_today ) || 0 }
   ];
+
+  //checking
+  
+  // console.log("pieData:", pieData);
 
   const chartAxisColor = theme.palette.text.secondary;
   const chartGridColor = theme.palette.divider;
@@ -274,7 +278,7 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                     title="Visitor Distribution"
                     description="A pie chart view of today's visitor share across students, staff, and guests."
                   >
-                    <Box sx={{ width: "100%", height: 360, minWidth: 0 }}>
+                    <Box style={{ width: "100%", height: 400 }}>
                       <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                           <Pie
@@ -283,7 +287,8 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                             nameKey="name"
                             cx="50%"
                             cy="50%"
-                            outerRadius={120}
+                            outerRadius={140}
+                            innerRadius={60}
                             label={({ name, percent }) => `${name} ${Math.round((percent || 0) * 100)}%`}
                             labelLine={false}
                           >
