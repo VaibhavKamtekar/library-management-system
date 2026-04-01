@@ -32,7 +32,8 @@ function buildVisitLogFilters(query) {
   const baseQuery = `
     FROM library_logs ll
     LEFT JOIN students s
-     ON ll.roll_no = s.roll_no
+      ON ll.visitor_type IN ('student', 'sport')
+      AND ll.roll_no = s.roll_no
     WHERE 1 = 1
   `;
 
@@ -54,7 +55,7 @@ function buildVisitLogFilters(query) {
   }
 
   if (department && department !== "all") {
-    whereClause += " AND s.department = ?";
+    whereClause += " AND ll.visitor_type IN ('student', 'sport') AND s.department = ?";
     params.push(department);
   }
 
@@ -111,7 +112,6 @@ router.get("/dashboard", (req, res) => {
     SELECT
       COUNT(*) AS total,
       SUM(visitor_type='student') AS students,
-      SUM(visitor_type = 'sport') as sports,
       SUM(visitor_type='staff') AS staff,
       SUM(visitor_type='guest') AS guests
     FROM library_logs
@@ -124,7 +124,6 @@ router.get("/dashboard", (req, res) => {
     res.json({
       total: result[0]?.total || 0,
       students: result[0]?.students || 0,
-      sports: result[0]?.sports || 0,
       staff: result[0]?.staff || 0,
       guests: result[0]?.guests || 0
     });
