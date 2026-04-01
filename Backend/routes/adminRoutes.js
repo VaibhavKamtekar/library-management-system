@@ -76,7 +76,7 @@ function buildVisitLogFilters(query) {
   const baseQuery = `
     FROM library_logs ll
     LEFT JOIN students s
-      ON ll.visitor_type = 'student'
+      ON ll.visitor_type IN ('student', 'sport')
       AND ll.roll_no = s.roll_no
     WHERE 1 = 1
   `;
@@ -101,11 +101,11 @@ function buildVisitLogFilters(query) {
 
   if (visitor_type && visitor_type !== "all") {
     whereClause += " AND ll.visitor_type = ?";
-    params.push(visitor_type);
+    params.push(visitor_type.toLowerCase());
   }
 
   if (department && department !== "all") {
-    whereClause += " AND s.department = ?";
+    whereClause += " AND ll.visitor_type IN ('student', 'sport') AND s.department = ?";
     params.push(department);
   }
 
@@ -447,25 +447,30 @@ router.get("/visit-logs", (req, res) => {
   `;
 
   const dataQuery = `
-    SELECT
-      ll.log_id,
-      ll.visitor_type,
-      ll.visitor_name,
-      ll.roll_no,
-      s.department,
-      ll.entry_time,
-      ll.exit_time,
-      ll.visit_date,
-      ll.use_computer,
-      CASE
-        WHEN ll.exit_time IS NULL THEN 'Inside'
-        ELSE 'Exited'
-      END AS status
-    ${baseQuery}
-    ${whereClause}
-    ORDER BY ll.entry_time DESC
-    LIMIT ? OFFSET ?
-  `;
+  SELECT
+    ll.log_id,
+    ll.visitor_type,
+    ll.visitor_name,
+    ll.roll_no,
+
+    CASE 
+      WHEN ll.visitor_type IN ('student', 'sport') THEN s.department
+      ELSE NULL
+    END AS department,
+
+    ll.entry_time,
+    ll.exit_time,
+    ll.visit_date,
+    ll.use_computer,
+    CASE
+      WHEN ll.exit_time IS NULL THEN 'Inside'
+      ELSE 'Exited'
+    END AS status
+  ${baseQuery}
+  ${whereClause}
+  ORDER BY ll.entry_time DESC
+  LIMIT ? OFFSET ?
+`;
 
   db.query(countQuery, params, (countErr, countResult) => {
     if (countErr) return res.status(500).json(countErr);
