@@ -31,7 +31,11 @@ import OperationalLayout from "./OperationalLayout";
 const DASHBOARD_API_URL = "http://localhost:5000/api/admin/footfall";
 const MONTHLY_FOOTFALL_API_URL = "http://localhost:5000/api/admin/monthly-footfall";
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-const PIE_COLORS = ["#2563eb", "#0f766e", "#7c3aed"];
+const VISITOR_COLORS = {
+  Students: "#2563eb",
+  Staff: "#0f766e",
+  Guests: "#7c3aed"
+};
 
 export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
   const theme = useTheme();
@@ -46,9 +50,9 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
   const [dashboardError, setDashboardError] = useState("");
 
   const chartData = [
-    { name: "Students", count: footfall.students_today },
-    { name: "Staff", count: footfall.staff_today },
-    { name: "Guests", count: footfall.guests_today }
+    { name: "Students", count: footfall.students_today, fill: VISITOR_COLORS.Students },
+    { name: "Staff", count: footfall.staff_today, fill: VISITOR_COLORS.Staff },
+    { name: "Guests", count: footfall.guests_today, fill: VISITOR_COLORS.Guests }
   ];
   const pieData = [
     { name: "Students", value: Number(footfall.students_today ) || 0 },
@@ -195,13 +199,25 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                     />
                     <Grid container spacing={2.5}>
                       <Grid size={{ xs: 12, md: 4 }}>
-                        <DashboardCard label="Students Today" value={footfall.students_today} accent="#2563eb" />
+                        <DashboardCard
+                          label="Students Today"
+                          value={footfall.students_today}
+                          accent={VISITOR_COLORS.Students}
+                        />
                       </Grid>
                       <Grid size={{ xs: 12, md: 4 }}>
-                        <DashboardCard label="Staff Today" value={footfall.staff_today} accent="#0f766e" />
+                        <DashboardCard
+                          label="Staff Today"
+                          value={footfall.staff_today}
+                          accent={VISITOR_COLORS.Staff}
+                        />
                       </Grid>
                       <Grid size={{ xs: 12, md: 4 }}>
-                        <DashboardCard label="Guests Today" value={footfall.guests_today} accent="#7c3aed" />
+                        <DashboardCard
+                          label="Guests Today"
+                          value={footfall.guests_today}
+                          accent={VISITOR_COLORS.Guests}
+                        />
                       </Grid>
                     </Grid>
                   </Stack>
@@ -234,7 +250,11 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                             tickLine={{ stroke: chartGridColor }}
                           />
                           <Tooltip />
-                          <Bar dataKey="count" fill="#2563eb" radius={[0, 8, 8, 0]} barSize={30} />
+                          <Bar dataKey="count" radius={[0, 8, 8, 0]} barSize={30}>
+                            {chartData.map((entry) => (
+                              <Cell key={entry.name} fill={entry.fill} />
+                            ))}
+                          </Bar>
                         </BarChart>
                       </ResponsiveContainer>
                     </Box>
@@ -292,8 +312,8 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                             label={({ name, percent }) => `${name} ${Math.round((percent || 0) * 100)}%`}
                             labelLine={false}
                           >
-                            {pieData.map((entry, index) => (
-                              <Cell key={entry.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />
+                            {pieData.map((entry) => (
+                              <Cell key={entry.name} fill={VISITOR_COLORS[entry.name]} />
                             ))}
                           </Pie>
                           <Tooltip />

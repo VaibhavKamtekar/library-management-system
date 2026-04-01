@@ -1,22 +1,59 @@
 const router = require("express").Router();
 const db = require("../db");
 
-/* =========================
-   STAFF LOGIN
-========================= */
-router.post("/login", (req, res) => {
-  const { name, password } = req.body;
+router.get("/", (req, res) => {
+  db.query(
+    "SELECT staff_id, name FROM staff ORDER BY name ASC",
+    (err, results) => {
+      if (err) {
+        console.error("DB ERROR:", err);
+        return res.status(500).json({ error: "DB error" });
+      }
 
-  if (!name || !password) {
-    return res.status(400).json({ success: false, message: "Missing credentials" });
+      res.json(results);
+    }
+  );
+});
+
+router.post("/login", (req, res) => {
+  const rawStaffId = String(req.body?.staffId ?? "").trim();
+  const password = String(req.body?.password ?? "").trim();
+  const staffId = Number.parseInt(rawStaffId, 10);
+
+  if (!rawStaffId || !password || Number.isNaN(staffId)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Missing credentials" });
   }
 
   db.query(
-    "SELECT * FROM staff WHERE name=? AND password=?",
-    [name, password],
-    (err, result) => {
-      if (err) return res.status(500).json({ success: false, message: "DB error" });
-      res.json({ success: result.length > 0 });
+    "SELECT staff_id, name, password FROM staff WHERE staff_id = ?",
+    [staffId],
+    (err, results) => {
+      if (err) {
+        return res
+          .status(500)
+          .json({ success: false, message: "DB error" });
+      }
+
+      if (results.length === 0) {
+        return res.json({ success: false, message: "Invalid credentials" });
+      }
+
+      const staff = results[0];
+      const storedPassword = String(staff.password ?? "").trim();
+
+      if (storedPassword !== password) {
+        return res.json({ success: false, message: "Invalid credentials" });
+      }
+
+      res.json({
+        success: true,
+        staff: {
+          staff_id: staff.staff_id,
+          name: staff.name
+        }
+      });
     }
   );
 });
@@ -35,7 +72,7 @@ router.post("/out", (req, res) => {
   db.query(
     `UPDATE library_logs
      SET exit_time = NOW()
-     WHERE visitor_name=? AND visitor_type='staff' AND exit_time IS NULL`,
+     WHERE visitor_name = ? AND visitor_type = 'staff' AND exit_time IS NULL`,
     [req.body.name],
     () => res.json({ message: "Staff OUT recorded" })
   );

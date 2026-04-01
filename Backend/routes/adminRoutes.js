@@ -18,16 +18,60 @@ const storage = multer.diskStorage({
   }
 });
 const upload = multer({ storage });
+const DATE_VALUE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+function isValidDateValue(value) {
+  if (typeof value !== "string" || !DATE_VALUE_PATTERN.test(value)) {
+    return false;
+  }
+
+  const [year, month, day] = value.split("-").map(Number);
+  const parsedDate = new Date(Date.UTC(year, month - 1, day));
+
+  return (
+    parsedDate.getUTCFullYear() === year &&
+    parsedDate.getUTCMonth() === month - 1 &&
+    parsedDate.getUTCDate() === day
+  );
+}
+
+function normalizeVisitDateRange(query) {
+  const legacyVisitDate =
+    typeof query.visit_date === "string" ? query.visit_date.trim() : "";
+  let fromDate =
+    typeof query.fromDate === "string" ? query.fromDate.trim() : "";
+  let toDate =
+    typeof query.toDate === "string" ? query.toDate.trim() : "";
+
+  if (!fromDate && !toDate && legacyVisitDate) {
+    fromDate = legacyVisitDate;
+    toDate = legacyVisitDate;
+  }
+
+  if (fromDate && !isValidDateValue(fromDate)) {
+    return { error: "Invalid fromDate value." };
+  }
+
+  if (toDate && !isValidDateValue(toDate)) {
+    return { error: "Invalid toDate value." };
+  }
+
+  if (fromDate && toDate && fromDate > toDate) {
+    [fromDate, toDate] = [toDate, fromDate];
+  }
+
+  return { fromDate, toDate };
+}
 
 function buildVisitLogFilters(query) {
   const {
-    visit_date,
     visitor_type,
     search,
     department,
     use_computer,
     status
   } = query;
+  const { fromDate, toDate, error } = normalizeVisitDateRange(query);
 
   const baseQuery = `
     FROM library_logs ll
@@ -39,14 +83,20 @@ function buildVisitLogFilters(query) {
 
   let whereClause = "";
   const params = [];
-  const hasExplicitVisitDate =
-    typeof query.visit_date === "string" && query.visit_date.trim() !== "";
 
-  // For "currently inside" queries, date should only be applied when the client
-  // explicitly sends one. This keeps the logs aligned with the active-session count.
-  if (hasExplicitVisitDate) {
-    whereClause += " AND ll.visit_date = ?";
-    params.push(visit_date);
+  if (error) {
+    return { error };
+  }
+
+  if (fromDate && toDate) {
+    whereClause += " AND ll.visit_date BETWEEN ? AND ?";
+    params.push(fromDate, toDate);
+  } else if (fromDate) {
+    whereClause += " AND ll.visit_date >= ?";
+    params.push(fromDate);
+  } else if (toDate) {
+    whereClause += " AND ll.visit_date <= ?";
+    params.push(toDate);
   }
 
   if (visitor_type && visitor_type !== "all") {
@@ -84,6 +134,25 @@ function toCsvValue(value) {
   if (value === null || value === undefined) return "";
   const stringValue = String(value).replace(/"/g, '""');
   return `"${stringValue}"`;
+}
+
+function getMonthlyFootfallData() {
+  const query = `
+    SELECT
+      YEAR(visit_date) AS year,
+      MONTH(visit_date) AS month,
+      DATE_FORMAT(MIN(visit_date), '%b %Y') AS month_label,
+      SUM(visitor_type = 'student') AS student_visits,
+      SUM(visitor_type = 'staff') AS staff_visits,
+      SUM(visitor_type = 'guest') AS guest_visits,
+      COUNT(*) AS total_visits
+    FROM library_logs
+    WHERE visit_date IS NOT NULL
+    GROUP BY YEAR(visit_date), MONTH(visit_date)
+    ORDER BY YEAR(visit_date), MONTH(visit_date)
+  `;
+
+  return db.promise().query(query);
 }
 
 /* =========================
@@ -183,23 +252,90 @@ router.get("/footfall", (req, res) => {
 });
 
 /* =========================
-   MONTHLY STUDENT FOOTFALL
+   MONTHLY FOOTFALL SUMMARY
 ========================= */
-router.get("/monthly-footfall", (req, res) => {
-  const query = `
-    SELECT 
-      MONTH(visit_date) AS month,
-      COUNT(*) AS total_students
-    FROM library_logs
-    WHERE visitor_type='student'
-    GROUP BY MONTH(visit_date)
-    ORDER BY month
-  `;
+router.get("/monthly-footfall", async (req, res) => {
+  try {
+    const [rows] = await getMonthlyFootfallData();
 
-  db.query(query, (err, result) => {
-    if (err) return res.status(500).json(err);
-    res.json(result);
-  });
+    res.json(
+      rows.map((row) => ({
+        year: row.year,
+        month: row.month,
+        month_label: row.month_label,
+        total_students: row.student_visits || 0,
+        total_staff: row.staff_visits || 0,
+        total_guests: row.guest_visits || 0,
+        total_visits: row.total_visits || 0
+      }))
+    );
+  } catch (error) {
+    return res.status(500).json({
+      message: "Unable to load monthly footfall."
+    });
+  }
+});
+
+/* =========================
+   MONTHLY FOOTFALL REPORT (EXCEL)
+========================= */
+router.get("/monthly-footfall-report", async (req, res) => {
+  try {
+    const [rows] = await getMonthlyFootfallData();
+    const worksheetData = [
+      [
+        "Month",
+        "Student Visits",
+        "Staff Visits",
+        "Guest Visits",
+        "Total Visits"
+      ],
+      ...rows.map((row) => ([
+        row.month_label,
+        row.student_visits || 0,
+        row.staff_visits || 0,
+        row.guest_visits || 0,
+        row.total_visits || 0
+      ]))
+    ];
+
+    const workbook = xlsx.utils.book_new();
+    const worksheet = xlsx.utils.aoa_to_sheet(worksheetData);
+
+    worksheet["!cols"] = [
+      { wch: 18 },
+      { wch: 16 },
+      { wch: 14 },
+      { wch: 14 },
+      { wch: 14 }
+    ];
+    worksheet["!autofilter"] = {
+      ref: `A1:E${Math.max(worksheetData.length, 1)}`
+    };
+
+    xlsx.utils.book_append_sheet(workbook, worksheet, "Monthly Footfall");
+
+    const fileBuffer = xlsx.write(workbook, {
+      type: "buffer",
+      bookType: "xlsx"
+    });
+    const generatedOn = new Date().toISOString().slice(0, 10);
+
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename="monthly-footfall-report-${generatedOn}.xlsx"`
+    );
+    res.setHeader(
+      "Content-Type",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    );
+
+    return res.status(200).send(fileBuffer);
+  } catch (error) {
+    return res.status(500).json({
+      message: "Unable to generate monthly footfall report."
+    });
+  }
 });
 
 /* =========================
@@ -291,7 +427,6 @@ router.get("/currently-inside", async (req, res) => {
 ========================= */
 router.get("/visit-logs", (req, res) => {
   const {
-    status,
     page = 1,
     limit = 10
   } = req.query;
@@ -299,7 +434,11 @@ router.get("/visit-logs", (req, res) => {
   const currentPage = Math.max(parseInt(page, 10) || 1, 1);
   const pageSize = Math.max(parseInt(limit, 10) || 10, 1);
   const offset = (currentPage - 1) * pageSize;
-  const { baseQuery, whereClause, params } = buildVisitLogFilters(req.query);
+  const { baseQuery, whereClause, params, error } = buildVisitLogFilters(req.query);
+
+  if (error) {
+    return res.status(400).json({ message: error });
+  }
 
   const countQuery = `
     SELECT COUNT(*) AS total
@@ -352,7 +491,14 @@ router.get("/visit-logs", (req, res) => {
 router.get("/export-logs", async (req, res) => {
   try {
     const dbPromise = db.promise();
-    const { baseQuery, whereClause, params } = buildVisitLogFilters(req.query);
+    const { baseQuery, whereClause, params, error } = buildVisitLogFilters(req.query);
+
+    if (error) {
+      return res.status(400).json({
+        message: error
+      });
+    }
+
     const exportQuery = `
       SELECT
         ll.visitor_type,

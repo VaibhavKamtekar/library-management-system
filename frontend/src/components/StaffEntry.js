@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import axios from "axios";
 import {
   Alert,
   Button,
+  MenuItem,
   Paper,
   Stack,
   TextField
@@ -11,23 +12,44 @@ import OperationalLayout from "./OperationalLayout";
 
 export default function StaffEntry({ setScreen, setUser, mode, onToggleMode }) {
   const [error, setError] = useState("");
+  const [staffList, setStaffList] = useState([]);
+  const [selectedStaffId, setSelectedStaffId] = useState("");
+
+  useEffect(() => {
+    const loadStaff = async () => {
+      try {
+        const res = await axios.get("http://localhost:5000/api/staff");
+        setStaffList(Array.isArray(res.data) ? res.data : []);
+      } catch (err) {
+        setError("Failed to load staff list.");
+      }
+    };
+
+    loadStaff();
+  }, []);
 
   const handleAuthorize = async (e) => {
     e.preventDefault();
     setError("");
 
-    const staffId = e.target.staffId.value.trim();
-    const name = e.target.name.value.trim();
     const password = e.target.password.value.trim();
+    const selectedStaff = staffList.find(
+      (staff) => String(staff.staff_id) === String(selectedStaffId)
+    );
 
-    if (!staffId || !name || !password) {
-      setError("Enter staff ID, staff name, and password.");
+    if (!selectedStaffId || !password) {
+      setError("Select staff and enter password.");
+      return;
+    }
+
+    if (!selectedStaff) {
+      setError("Selected staff record was not found. Please try again.");
       return;
     }
 
     try {
       const res = await axios.post("http://localhost:5000/api/staff/login", {
-        name,
+        staffId: selectedStaffId,
         password
       });
 
@@ -38,8 +60,8 @@ export default function StaffEntry({ setScreen, setUser, mode, onToggleMode }) {
 
       setUser({
         type: "staff",
-        name,
-        staffId
+        name: res.data.staff?.name || selectedStaff.name,
+        staffId: String(selectedStaff.staff_id)
       });
       setScreen("inout");
     } catch (err) {
@@ -50,21 +72,54 @@ export default function StaffEntry({ setScreen, setUser, mode, onToggleMode }) {
   return (
     <OperationalLayout
       title="Staff login"
-      subtitle="Use the registered staff credentials to continue to the visit logging screen."
+      subtitle="Select your name and enter password to continue."
       sectionLabel="Staff Workflow"
       mode={mode}
       onToggleMode={onToggleMode}
     >
       <Paper sx={paperSx} component="form" onSubmit={handleAuthorize}>
         <Stack spacing={2.5}>
-          <TextField label="Staff ID" name="staffId" required fullWidth />
-          <TextField label="Staff Name" name="name" required fullWidth />
-          <TextField label="Password" name="password" type="password" required fullWidth />
+          <TextField
+            select
+            label="Select Staff"
+            value={selectedStaffId}
+            onChange={(e) => {
+              setSelectedStaffId(e.target.value);
+              setError("");
+            }}
+            required
+            fullWidth
+          >
+            <MenuItem value="">Select Staff</MenuItem>
+            {staffList.map((staff) => (
+              <MenuItem
+                key={staff.staff_id}
+                value={String(staff.staff_id)}
+              >
+                {staff.name}
+              </MenuItem>
+            ))}
+          </TextField>
+
+          <TextField
+            label="Password"
+            name="password"
+            type="password"
+            required
+            fullWidth
+          />
+
           {error && <Alert severity="error">{error}</Alert>}
+
           <Button type="submit" variant="contained" sx={primaryButtonSx}>
             Continue
           </Button>
-          <Button variant="outlined" sx={secondaryButtonSx} onClick={() => setScreen("home")}>
+
+          <Button
+            variant="outlined"
+            sx={secondaryButtonSx}
+            onClick={() => setScreen("home")}
+          >
             Back
           </Button>
         </Stack>
@@ -78,7 +133,8 @@ const paperSx = {
   borderRadius: 4,
   border: "1px solid",
   borderColor: "divider",
-  background: (theme) => (theme.palette.mode === "dark" ? "#16243a" : "#ffffff")
+  background: (theme) =>
+    theme.palette.mode === "dark" ? "#16243a" : "#ffffff"
 };
 
 const primaryButtonSx = {

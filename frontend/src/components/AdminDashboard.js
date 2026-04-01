@@ -54,14 +54,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   const [logsLoading, setLogsLoading] = useState(true);
   const [error, setError] = useState("");
   const [logError, setLogError] = useState("");
-  const [filters, setFilters] = useState({
-    visit_date: getTodayValue(),
-    visitor_type: "all",
-    search: "",
-    department: "",
-    use_computer: "all",
-    status: "all"
-  });
+  const [filters, setFilters] = useState(getDefaultLogFilters);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -117,13 +110,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
       setLogError("");
 
       try {
-        const params = {};
-
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value && value !== "all") {
-            params[key] = value;
-          }
-        });
+        const params = buildLogQueryParams(filters);
 
         params.page = currentPage;
         params.limit = pageLimit;
@@ -134,7 +121,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
         setTotalPages(res.data.totalPages || 1);
         setTotalLogs(res.data.total || 0);
       } catch (err) {
-        setLogError("Visit logs could not be loaded.");
+        setLogError(err.response?.data?.message || "Visit logs could not be loaded.");
       } finally {
         setLogsLoading(false);
       }
@@ -167,13 +154,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
 
   const handleExportLogs = async () => {
     try {
-      const params = {};
-
-      Object.entries(filters).forEach(([key, value]) => {
-        if (value && value !== "all") {
-          params[key] = value;
-        }
-      });
+      const params = buildLogQueryParams(filters);
 
       const response = await axios.get("http://localhost:5000/api/admin/export-logs", {
         params,
@@ -191,6 +172,33 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
       window.URL.revokeObjectURL(url);
     } catch (err) {
       setUploadMsg("Log export failed.");
+    }
+  };
+
+  const handleDownloadMonthlyReport = async () => {
+    try {
+      const response = await axios.get("http://localhost:5000/api/admin/monthly-footfall-report", {
+        responseType: "blob"
+      });
+      const blob = new Blob([response.data], {
+        type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+      });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = getDownloadFileName(
+        response.headers["content-disposition"],
+        "monthly-footfall-report.xlsx"
+      );
+
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      setUploadMsg("Monthly footfall report downloaded successfully.");
+    } catch (err) {
+      setUploadMsg("Monthly report download failed.");
     }
   };
 
@@ -214,7 +222,8 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   const handleCurrentlyInsideClick = () => {
     setFilters((prev) => ({
       ...prev,
-      visit_date: "",
+      fromDate: "",
+      toDate: "",
       status: "inside"
     }));
   };
@@ -314,28 +323,51 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                   Visit log filters
                 </Typography>
                 <Typography sx={panelTextSx}>
-                  Narrow down logs by date, visitor type, status, and visitor details. Quick date actions are provided for common desk workflows.
+                  Narrow down logs by date range, visitor type, status, and visitor details. Quick date actions are provided for common desk workflows.
                 </Typography>
                 <Stack direction="row" spacing={1} sx={{ mt: 2, flexWrap: "wrap", gap: 1 }}>
-                  <Chip label="Today" onClick={() => updateFilter(setFilters, "visit_date", getTodayValue())} sx={actionChipSx} />
-                  <Chip label="Yesterday" onClick={() => updateFilter(setFilters, "visit_date", getRelativeDateValue(-1))} sx={actionChipSx} />
-                  <Chip label="All Dates" onClick={() => updateFilter(setFilters, "visit_date", "")} sx={actionChipSx} />
+                  <Chip
+                    label="Today"
+                    onClick={() => setDateRangeFilters(setFilters, getTodayValue(), getTodayValue())}
+                    sx={actionChipSx}
+                  />
+                  <Chip
+                    label="Yesterday"
+                    onClick={() => setDateRangeFilters(setFilters, getRelativeDateValue(-1), getRelativeDateValue(-1))}
+                    sx={actionChipSx}
+                  />
+                  <Chip
+                    label="All Dates"
+                    onClick={() => setDateRangeFilters(setFilters, "", "")}
+                    sx={actionChipSx}
+                  />
                 </Stack>
                 <Grid container spacing={2} sx={{ mt: 1 }}>
                   <Grid item xs={12} sm={6} md={3}>
                     <FilterField
-                      title="Log Date"
-                      helper="Choose a specific visit date"
+                      title="Date Range"
+                      helper="Choose a from and to date. Leave one side empty for an open range."
                       field={
-                        <TextField
-                          label="Visit Date"
-                          type="date"
-                          fullWidth
-                          InputLabelProps={{ shrink: true }}
-                          value={filters.visit_date}
-                          onChange={(e) => updateFilter(setFilters, "visit_date", e.target.value)}
-                          sx={filterInputSx}
-                        />
+                        <Stack spacing={1.5}>
+                          <TextField
+                            label="From Date"
+                            type="date"
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={filters.fromDate}
+                            onChange={(e) => updateFilter(setFilters, "fromDate", e.target.value)}
+                            sx={filterInputSx}
+                          />
+                          <TextField
+                            label="To Date"
+                            type="date"
+                            fullWidth
+                            InputLabelProps={{ shrink: true }}
+                            value={filters.toDate}
+                            onChange={(e) => updateFilter(setFilters, "toDate", e.target.value)}
+                            sx={filterInputSx}
+                          />
+                        </Stack>
                       }
                     />
                   </Grid>
@@ -447,16 +479,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                           <Button
                             variant="outlined"
                             sx={clearButtonSx}
-                            onClick={() =>
-                              setFilters({
-                                visit_date: getTodayValue(),
-                                visitor_type: "all",
-                                search: "",
-                                department: "",
-                                use_computer: "all",
-                                status: "all"
-                              })
-                            }
+                            onClick={() => setFilters(getDefaultLogFilters())}
                           >
                             Reset Filters
                           </Button>
@@ -657,15 +680,34 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
           <Grid container spacing={2}>
             <Grid item xs={12} lg={7}>
               <Paper sx={panelSx}>
-                <Typography variant="h6" sx={panelTitleSx}>
-                  Monthly student footfall
-                </Typography>
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1.5}
+                  justifyContent="space-between"
+                  alignItems={{ xs: "stretch", sm: "center" }}
+                >
+                  <Box>
+                    <Typography variant="h6" sx={panelTitleSx}>
+                      Monthly student footfall
+                    </Typography>
+                    <Typography sx={panelTextSx}>
+                      Download a month-wise Excel report with student, staff, guest, and total visit counts.
+                    </Typography>
+                  </Box>
+                  <Button
+                    variant="contained"
+                    sx={reportButtonSx}
+                    onClick={handleDownloadMonthlyReport}
+                  >
+                    Download Monthly Report
+                  </Button>
+                </Stack>
                 <Stack spacing={1.4} sx={{ mt: 2 }}>
                   {monthlyFootfall.map((item) => (
-                    <Box key={item.month}>
+                    <Box key={`${item.year || "year"}-${item.month}`}>
                       <Stack direction="row" justifyContent="space-between" sx={{ mb: 0.6 }}>
                         <Typography sx={{ color: "text.secondary" }}>
-                          {monthLabel(item.month)}
+                          {item.month_label || monthLabel(item.month)}
                         </Typography>
                         <Typography sx={{ color: "text.secondary" }}>
                           {item.total_students}
@@ -733,6 +775,56 @@ function updateFilter(setFilters, key, value) {
   }));
 }
 
+function setDateRangeFilters(setFilters, fromDate, toDate) {
+  setFilters((prev) => ({
+    ...prev,
+    fromDate,
+    toDate
+  }));
+}
+
+function getDefaultLogFilters() {
+  const today = getTodayValue();
+
+  return {
+    fromDate: today,
+    toDate: today,
+    visitor_type: "all",
+    search: "",
+    department: "",
+    use_computer: "all",
+    status: "all"
+  };
+}
+
+function buildLogQueryParams(filters) {
+  const normalizedFilters = normalizeDateRangeFilters(filters);
+  const params = {};
+
+  Object.entries(normalizedFilters).forEach(([key, value]) => {
+    if (value && value !== "all") {
+      params[key] = value;
+    }
+  });
+
+  return params;
+}
+
+function normalizeDateRangeFilters(filters) {
+  const fromDate = filters.fromDate || "";
+  const toDate = filters.toDate || "";
+
+  if (fromDate && toDate && fromDate > toDate) {
+    return {
+      ...filters,
+      fromDate: toDate,
+      toDate: fromDate
+    };
+  }
+
+  return filters;
+}
+
 function formatDate(value) {
   if (!value) return "-";
   return new Date(value).toLocaleDateString("en-IN");
@@ -752,6 +844,26 @@ function formatDateTime(value) {
 function monthLabel(monthNumber) {
   const labels = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return labels[monthNumber - 1] || `Month ${monthNumber}`;
+}
+
+function getDownloadFileName(contentDisposition, fallbackName) {
+  if (!contentDisposition) {
+    return fallbackName;
+  }
+
+  const utfMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+
+  if (utfMatch?.[1]) {
+    return decodeURIComponent(utfMatch[1]);
+  }
+
+  const standardMatch = contentDisposition.match(/filename="([^"]+)"/i);
+
+  if (standardMatch?.[1]) {
+    return standardMatch[1];
+  }
+
+  return fallbackName;
 }
 
 function getTodayValue() {
@@ -911,6 +1023,18 @@ const uploadButtonSx = {
   borderRadius: 3,
   fontWeight: 700,
   background: "#2563eb"
+};
+
+const reportButtonSx = {
+  py: 1.05,
+  px: 2,
+  borderRadius: 3,
+  fontWeight: 700,
+  background: "#0f766e",
+  whiteSpace: "nowrap",
+  "&:hover": {
+    background: "#0b5f59"
+  }
 };
 
 const logoutButtonSx = {

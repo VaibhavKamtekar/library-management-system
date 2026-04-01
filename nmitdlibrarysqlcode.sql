@@ -29,9 +29,11 @@ INSERT INTO admin VALUES (1, 'admin', 'admin123');
 CREATE TABLE staff (
     staff_id INT AUTO_INCREMENT PRIMARY KEY,
     name VARCHAR(100) NOT NULL,
-    password VARCHAR(100) NOT NULL,
+    password VARCHAR(255) NOT NULL,
     active BOOLEAN DEFAULT TRUE
 );
+
+
 INSERT INTO staff (name, password) VALUES
 ('Staff1', 'staff123'),
 ('Staff2', 'staff123');
