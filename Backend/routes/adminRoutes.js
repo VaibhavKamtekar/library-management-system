@@ -143,6 +143,11 @@ function getMonthlyFootfallData() {
       MONTH(visit_date) AS month,
       DATE_FORMAT(MIN(visit_date), '%b %Y') AS month_label,
       SUM(visitor_type = 'student') AS student_visits,
+      SUM(visitor_type = 'sport') AS sport_visits,
+      SUM(
+        visitor_type = 'student'
+        AND LOWER(COALESCE(use_computer, '')) IN ('yes', 'true', '1')
+      ) AS computer_visits,
       SUM(visitor_type = 'staff') AS staff_visits,
       SUM(visitor_type = 'guest') AS guest_visits,
       COUNT(*) AS total_visits
@@ -181,6 +186,11 @@ router.get("/dashboard", (req, res) => {
     SELECT
       COUNT(*) AS total,
       SUM(visitor_type='student') AS students,
+      SUM(visitor_type='sport') AS sport,
+      SUM(
+        visitor_type='student'
+        AND LOWER(COALESCE(use_computer, '')) IN ('yes', 'true', '1')
+      ) AS computer,
       SUM(visitor_type='staff') AS staff,
       SUM(visitor_type='guest') AS guests
     FROM library_logs
@@ -193,6 +203,8 @@ router.get("/dashboard", (req, res) => {
     res.json({
       total: result[0]?.total || 0,
       students: result[0]?.students || 0,
+      sport: result[0]?.sport || 0,
+      computer: result[0]?.computer || 0,
       staff: result[0]?.staff || 0,
       guests: result[0]?.guests || 0
     });
@@ -229,9 +241,20 @@ router.get("/footfall", (req, res) => {
   const query = `
     SELECT
       SUM(visitor_type='student') AS total_students,
-      SUM(visitor_type='student' AND use_computer='YES') AS computer_users,
-      SUM(visitor_type='student' AND use_computer='NO') AS non_computer_users,
+      SUM(
+        visitor_type='student'
+        AND LOWER(COALESCE(use_computer, '')) IN ('yes', 'true', '1')
+      ) AS computer_users,
+      SUM(
+        visitor_type='student'
+        AND LOWER(COALESCE(use_computer, '')) NOT IN ('yes', 'true', '1')
+      ) AS non_computer_users,
       SUM(visitor_type='student') AS students_today,
+      SUM(visitor_type='sport') AS sport_today,
+      SUM(
+        visitor_type='student'
+        AND LOWER(COALESCE(use_computer, '')) IN ('yes', 'true', '1')
+      ) AS computer_today,
       SUM(visitor_type='staff') AS staff_today,
       SUM(visitor_type='guest') AS guests_today
     FROM library_logs
@@ -245,6 +268,8 @@ router.get("/footfall", (req, res) => {
       computer_users: result[0]?.computer_users || 0,
       non_computer_users: result[0]?.non_computer_users || 0,
       students_today: result[0]?.students_today || 0,
+      sport_today: result[0]?.sport_today || 0,
+      computer_today: result[0]?.computer_today || 0,
       staff_today: result[0]?.staff_today || 0,
       guests_today: result[0]?.guests_today || 0
     });
@@ -264,6 +289,8 @@ router.get("/monthly-footfall", async (req, res) => {
         month: row.month,
         month_label: row.month_label,
         total_students: row.student_visits || 0,
+        total_sport: row.sport_visits || 0,
+        total_computer: row.computer_visits || 0,
         total_staff: row.staff_visits || 0,
         total_guests: row.guest_visits || 0,
         total_visits: row.total_visits || 0

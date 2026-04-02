@@ -33,6 +33,8 @@ const MONTHLY_FOOTFALL_API_URL = "http://localhost:5000/api/admin/monthly-footfa
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const VISITOR_COLORS = {
   Students: "#2563eb",
+  Sport: "#dc2626",
+  Computer: "#ea580c",
   Staff: "#0f766e",
   Guests: "#7c3aed"
 };
@@ -42,6 +44,8 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
   const [mode, setMode] = useState("entry");
   const [footfall, setFootfall] = useState({
     students_today: 0,
+    sport_today: 0,
+    computer_today: 0,
     staff_today: 0,
     guests_today: 0
   });
@@ -51,11 +55,15 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
 
   const chartData = [
     { name: "Students", count: footfall.students_today, fill: VISITOR_COLORS.Students },
+    { name: "Sport", count: footfall.sport_today, fill: VISITOR_COLORS.Sport },
+    { name: "Computer", count: footfall.computer_today, fill: VISITOR_COLORS.Computer },
     { name: "Staff", count: footfall.staff_today, fill: VISITOR_COLORS.Staff },
     { name: "Guests", count: footfall.guests_today, fill: VISITOR_COLORS.Guests }
   ];
   const pieData = [
     { name: "Students", value: Number(footfall.students_today ) || 0 },
+    { name: "Sport", value: Number(footfall.sport_today) || 0 },
+    { name: "Computer", value: Number(footfall.computer_today) || 0 },
     { name: "Staff", value: Number(footfall.staff_today ) || 0 },
     { name: "Guests", value: Number(footfall.guests_today ) || 0 }
   ];
@@ -66,6 +74,13 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
 
   const chartAxisColor = theme.palette.text.secondary;
   const chartGridColor = theme.palette.divider;
+  const todayCards = [
+    { label: "Students Today", value: footfall.students_today, accent: VISITOR_COLORS.Students },
+    { label: "Sport Today", value: footfall.sport_today, accent: VISITOR_COLORS.Sport },
+    { label: "Computer Usage", value: footfall.computer_today, accent: VISITOR_COLORS.Computer },
+    { label: "Staff Today", value: footfall.staff_today, accent: VISITOR_COLORS.Staff },
+    { label: "Guests Today", value: footfall.guests_today, accent: VISITOR_COLORS.Guests }
+  ];
 
   useEffect(() => {
     if (mode !== "dashboard") {
@@ -87,13 +102,20 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
         if (!ignore) {
           setFootfall({
             students_today: footfallResponse.data?.students_today || 0,
+            sport_today: footfallResponse.data?.sport_today || 0,
+            computer_today:
+              footfallResponse.data?.computer_today ||
+              footfallResponse.data?.computer_users ||
+              0,
             staff_today: footfallResponse.data?.staff_today || 0,
             guests_today: footfallResponse.data?.guests_today || 0
           });
           setMonthlyFootfall(
             (monthlyResponse.data || []).map((item) => ({
               month: MONTH_LABELS[(item.month || 1) - 1] || String(item.month || ""),
-              count: item.count || item.total_students || 0
+              count: item.count || item.total_students || 0,
+              total_sport: item.total_sport || 0,
+              total_computer: item.total_computer || 0
             }))
           );
         }
@@ -195,30 +217,14 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                   <Stack spacing={2.25}>
                     <SectionHeading
                       title="Today's Footfall"
-                      description="A quick summary of today's student, staff, and guest visits."
+                      description="A quick summary of today's student, sport, computer, staff, and guest activity."
                     />
                     <Grid container spacing={2.5}>
-                      <Grid size={{ xs: 12, md: 4 }}>
-                        <DashboardCard
-                          label="Students Today"
-                          value={footfall.students_today}
-                          accent={VISITOR_COLORS.Students}
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 12, md: 4 }}>
-                        <DashboardCard
-                          label="Staff Today"
-                          value={footfall.staff_today}
-                          accent={VISITOR_COLORS.Staff}
-                        />
-                      </Grid>
-                      <Grid size={{ xs: 12, md: 4 }}>
-                        <DashboardCard
-                          label="Guests Today"
-                          value={footfall.guests_today}
-                          accent={VISITOR_COLORS.Guests}
-                        />
-                      </Grid>
+                      {todayCards.map((card) => (
+                        <Grid key={card.label} size={{ xs: 12, sm: 6, md: 4 }}>
+                          <DashboardCard label={card.label} value={card.value} accent={card.accent} />
+                        </Grid>
+                      ))}
                     </Grid>
                   </Stack>
 
@@ -244,7 +250,7 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
                           <YAxis
                             type="category"
                             dataKey="name"
-                            width={110}
+                            width={132}
                             tick={{ fontSize: 20, fill: theme.palette.text.primary, fontWeight: "bold" }}
                             axisLine={{ stroke: chartGridColor }}
                             tickLine={{ stroke: chartGridColor }}
@@ -296,7 +302,7 @@ export default function Home({ setScreen, mode: themeMode, onToggleMode }) {
 
                   <ChartSection
                     title="Visitor Distribution"
-                    description="A pie chart view of today's visitor share across students, staff, and guests."
+                    description="A pie chart view of today's visitor activity across students, sport, computer, staff, and guests."
                   >
                     <Box style={{ width: "100%", height: 400 }}>
                       <ResponsiveContainer width="100%" height="100%">

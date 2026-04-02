@@ -11,7 +11,7 @@ CREATE TABLE students (
 );
 CREATE TABLE library_logs (
     log_id INT AUTO_INCREMENT PRIMARY KEY,
-    visitor_type ENUM('student','staff','guest') NOT NULL,
+    visitor_type ENUM('student','sport','staff','guest') NOT NULL,
     visitor_name VARCHAR(100),
     roll_no VARCHAR(20),
     entry_time DATETIME,
@@ -51,3 +51,9 @@ INSERT INTO students (roll_no, name, year, department) VALUES
 
 ALTER TABLE library_logs
 ADD COLUMN use_computer ENUM('YES','NO') DEFAULT 'NO';
+
+ALTER TABLE library_logs
+MODIFY COLUMN visitor_type ENUM('student','sport','staff','guest') NOT NULL;
+
+ALTER TABLE library_logs
+ADD COLUMN sport_name VARCHAR(100) NULL AFTER roll_no;

@@ -2,10 +2,10 @@ const router = require("express").Router();
 const db = require("../db");
 
 router.post("/", async (req, res) => {
-  const { type, use_computer } = req.body;
+  const { type, use_computer, sport } = req.body;
   const dbPromise = db.promise();
 
-  if (!type || !["student", "staff", "guest"].includes(type)) {
+  if (!type || !["student", "sport", "staff", "guest"].includes(type)) {
     return res.status(400).json({
       status: "ERROR",
       message: "Invalid visitor type.",
@@ -18,16 +18,25 @@ router.post("/", async (req, res) => {
     let rollNo = null;
     let department = null;
     let sessionUseComputer = "NO";
+    let sportName = null;
     let activeWhere = "";
     let activeParams = [];
 
-    if (type === "student") {
+    if (type === "student" || type === "sport") {
       const { roll_no } = req.body;
 
       if (!roll_no) {
         return res.status(400).json({
           status: "ERROR",
-          message: "roll_no is required for student visits.",
+          message: "roll_no is required for student or sport visits.",
+          data: {}
+        });
+      }
+
+      if (type === "sport" && !sport) {
+        return res.status(400).json({
+          status: "ERROR",
+          message: "sport is required for sport visits.",
           data: {}
         });
       }
@@ -48,8 +57,9 @@ router.post("/", async (req, res) => {
       visitorName = students[0].name;
       department = students[0].department;
       rollNo = students[0].roll_no;
-      sessionUseComputer = use_computer || "NO";
-      activeWhere = "visitor_type = 'student' AND roll_no = ? AND exit_time IS NULL";
+      sessionUseComputer = type === "student" ? use_computer || "NO" : "NO";
+      sportName = type === "sport" ? sport : null;
+      activeWhere = "roll_no = ? AND exit_time IS NULL";
       activeParams = [rollNo];
     }
 
@@ -104,13 +114,20 @@ router.post("/", async (req, res) => {
     );
 
     if (activeSessions.length > 0) {
-      const sessionIds = activeSessions.map((session) => session.log_id);
-      const placeholders = sessionIds.map(() => "?").join(",");
+      if (rollNo) {
+        await dbPromise.query(
+          "UPDATE library_logs SET exit_time = NOW() WHERE roll_no = ? AND exit_time IS NULL",
+          [rollNo]
+        );
+      } else {
+        const sessionIds = activeSessions.map((session) => session.log_id);
+        const placeholders = sessionIds.map(() => "?").join(",");
 
-      await dbPromise.query(
-        `UPDATE library_logs SET exit_time = NOW() WHERE log_id IN (${placeholders})`,
-        sessionIds
-      );
+        await dbPromise.query(
+          `UPDATE library_logs SET exit_time = NOW() WHERE log_id IN (${placeholders})`,
+          sessionIds
+        );
+      }
 
       return res.status(200).json({
         status: "EXIT",
@@ -120,24 +137,36 @@ router.post("/", async (req, res) => {
           visitor_name: visitorName,
           roll_no: rollNo,
           department,
-          closed_sessions: sessionIds.length
+          closed_sessions: activeSessions.length
         }
       });
     }
 
-    const insertValues = [
-      type,
-      visitorName,
-      rollNo,
-      sessionUseComputer
-    ];
+    if (type === "sport") {
+      await dbPromise.query(
+        `INSERT INTO library_logs
+          (visitor_type, visitor_name, roll_no, entry_time, visit_date, use_computer, sport_name)
+         VALUES
+          ('student', ?, ?, NOW(), CURDATE(), 'NO', NULL),
+          ('sport', ?, ?, NOW(), CURDATE(), 'NO', ?)`,
+        [visitorName, rollNo, visitorName, rollNo, sportName]
+      );
+    } else {
+      const insertValues = [
+        type,
+        visitorName,
+        rollNo,
+        sessionUseComputer,
+        sportName
+      ];
 
-    await dbPromise.query(
-      `INSERT INTO library_logs
-        (visitor_type, visitor_name, roll_no, entry_time, visit_date, use_computer)
-       VALUES (?, ?, ?, NOW(), CURDATE(), ?)`,
-      insertValues
-    );
+      await dbPromise.query(
+        `INSERT INTO library_logs
+          (visitor_type, visitor_name, roll_no, entry_time, visit_date, use_computer, sport_name)
+         VALUES (?, ?, ?, NOW(), CURDATE(), ?, ?)`,
+        insertValues
+      );
+    }
 
     return res.status(200).json({
       status: "ENTRY",
@@ -147,13 +176,15 @@ router.post("/", async (req, res) => {
         visitor_name: visitorName,
         roll_no: rollNo,
         department,
-        use_computer: type === "student" ? sessionUseComputer : null
+        use_computer: type === "student" ? sessionUseComputer : null,
+        sport: sportName
       }
     });
   } catch (error) {
+    console.error("Visit route error:", error);
     return res.status(500).json({
       status: "ERROR",
-      message: "Unable to process visit request.",
+      message: error.sqlMessage || "Unable to process visit request.",
       data: {}
     });
   }

@@ -29,6 +29,8 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   const [summary, setSummary] = useState({
     total: 0,
     students: 0,
+    sport: 0,
+    computer: 0,
     staff: 0,
     guests: 0
   });
@@ -218,6 +220,15 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
     1
   );
   const insideFilterActive = filters.status === "inside";
+  const summaryCards = [
+    { label: "Total Entries Today", value: summary.total, accent: "linear-gradient(135deg, #1d4ed8, #60a5fa)" },
+    { label: "Students", value: summary.students, accent: "linear-gradient(135deg, #0f766e, #34d399)" },
+    { label: "Sport", value: summary.sport, accent: "linear-gradient(135deg, #dc2626, #fb7185)" },
+    { label: "Computer Usage", value: summary.computer, accent: "linear-gradient(135deg, #ea580c, #fdba74)" },
+    { label: "Staff", value: summary.staff, accent: "linear-gradient(135deg, #b45309, #f59e0b)" },
+    { label: "Guests", value: summary.guests, accent: "linear-gradient(135deg, #7c3aed, #c084fc)" },
+    { label: "Currently Inside", value: currentlyInside, accent: "linear-gradient(135deg, #be123c, #fb7185)" }
+  ];
 
   const handleCurrentlyInsideClick = () => {
     setFilters((prev) => ({
@@ -278,14 +289,15 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
           {uploadMsg && <Alert severity={uploadMsg.includes("failed") ? "error" : "success"}>{uploadMsg}</Alert>}
 
           <Grid container spacing={2}>
-            {[
-              { label: "Total Entries Today", value: summary.total, accent: "linear-gradient(135deg, #1d4ed8, #60a5fa)" },
-              { label: "Students", value: summary.students, accent: "linear-gradient(135deg, #0f766e, #34d399)" },
-              { label: "Staff", value: summary.staff, accent: "linear-gradient(135deg, #b45309, #f59e0b)" },
-              { label: "Guests", value: summary.guests, accent: "linear-gradient(135deg, #7c3aed, #c084fc)" },
-              { label: "Currently Inside", value: currentlyInside, accent: "linear-gradient(135deg, #be123c, #fb7185)" }
-            ].map((item) => (
-              <Grid item xs={12} sm={6} lg={item.label === "Currently Inside" ? 12 : 3} xl={item.label === "Currently Inside" ? 3 : undefined} key={item.label}>
+            {summaryCards.map((item) => (
+              <Grid
+                item
+                xs={12}
+                sm={6}
+                lg={item.label === "Currently Inside" ? 12 : 3}
+                xl={item.label === "Currently Inside" ? 3 : undefined}
+                key={item.label}
+              >
                 <Paper
                   onClick={item.label === "Currently Inside" ? handleCurrentlyInsideClick : undefined}
                   sx={{

@@ -18,7 +18,24 @@ import OperationalLayout from "./OperationalLayout";
 
 export default function InOut({ user, setMessage, setScreen, mode, onToggleMode }) {
   const [useComputer, setUseComputer] = useState("NO");
+  const [sport, setSport] = useState("");
   const [error, setError] = useState("");
+
+  const handleComputerChange = (value) => {
+    setUseComputer(value);
+
+    if (value === "YES") {
+      setSport("");
+    }
+  };
+
+  const handleSportChange = (value) => {
+    setSport(value);
+
+    if (value) {
+      setUseComputer("NO");
+    }
+  };
 
   const handleSubmitVisit = async () => {
     setError("");
@@ -27,11 +44,19 @@ export default function InOut({ user, setMessage, setScreen, mode, onToggleMode 
       let data = {};
 
       if (user.type === "student") {
-        data = {
-          type: "student",
-          roll_no: user.rollNo,
-          use_computer: useComputer
-        };
+        if (sport) {
+          data = {
+            type: "sport",
+            roll_no: user.rollNo,
+            sport
+          };
+        } else {
+          data = {
+            type: "student",
+            roll_no: user.rollNo,
+            use_computer: useComputer
+          };
+        }
       }
 
       if (user.type === "staff") {
@@ -62,9 +87,17 @@ export default function InOut({ user, setMessage, setScreen, mode, onToggleMode 
         return;
       }
 
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+        return;
+      }
+
       setError("Unable to record visit right now. Please try again.");
     }
   };
+
+  const displayType =
+    user.type === "student" && sport ? "sport" : user.type;
 
   return (
     <OperationalLayout
@@ -81,29 +114,52 @@ export default function InOut({ user, setMessage, setScreen, mode, onToggleMode 
               Current visitor
             </Typography>
             <Stack direction="row" spacing={1} sx={{ mt: 1.5, flexWrap: "wrap", gap: 1 }}>
-              <Chip label={`Type: ${user.type || "N/A"}`} />
+              <Chip label={`Type: ${displayType || "N/A"}`} />
               {user.name && <Chip label={`Name: ${user.name}`} />}
               {user.staffId && <Chip label={`Staff ID: ${user.staffId}`} />}
               {user.rollNo && <Chip label={`Roll No: ${user.rollNo}`} />}
               {user.department && <Chip label={`Department: ${user.department}`} />}
+              {sport && <Chip label={`Sport: ${sport}`} color="success" />}
             </Stack>
           </Box>
 
           {user.type === "student" && (
-            <FormControl>
-              <FormLabel>Computer usage</FormLabel>
-              <RadioGroup row value={useComputer} onChange={(e) => setUseComputer(e.target.value)}>
-                <FormControlLabel value="YES" control={<Radio />} label="Using computer" />
-                <FormControlLabel value="NO" control={<Radio />} label="Not using computer" />
-              </RadioGroup>
-            </FormControl>
+            <>
+              <FormControl disabled={!!sport}>
+                <FormLabel>
+                  Computer usage {sport && "(Disabled when sport selected)"}
+                </FormLabel>
+                <RadioGroup
+                  row
+                  value={useComputer}
+                  onChange={(e) => handleComputerChange(e.target.value)}
+                >
+                  <FormControlLabel value="YES" control={<Radio />} label="Using computer" />
+                  <FormControlLabel value="NO" control={<Radio />} label="Not using computer" />
+                </RadioGroup>
+              </FormControl>
+
+              <FormControl sx={{ mt: 2 }} disabled={useComputer === "YES"}>
+                <FormLabel>
+                  Select Sport (Optional) {useComputer === "YES" && "(Disabled while using computer)"}
+                </FormLabel>
+                <RadioGroup
+                  row
+                  value={sport}
+                  onChange={(e) => handleSportChange(e.target.value)}
+                >
+                  <FormControlLabel value="Carrom" control={<Radio />} label="Carrom" />
+                  <FormControlLabel value="Table Tennis" control={<Radio />} label="Table Tennis" />
+                </RadioGroup>
+              </FormControl>
+            </>
           )}
 
           {error && <Alert severity="error">{error}</Alert>}
 
           <Stack direction={{ xs: "column", sm: "row" }} spacing={2}>
             <Button variant="contained" sx={submitButtonSx} onClick={handleSubmitVisit}>
-              Submit Visit
+              {sport ? "Submit Sport Entry" : "Submit Visit"}
             </Button>
             <Button variant="outlined" sx={secondaryButtonSx} onClick={() => setScreen("home")}>
               Cancel
