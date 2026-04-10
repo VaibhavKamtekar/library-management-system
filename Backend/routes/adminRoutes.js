@@ -68,6 +68,7 @@ function buildVisitLogFilters(query) {
     visitor_type,
     search,
     department,
+    course,
     use_computer,
     status
   } = query;
@@ -104,9 +105,11 @@ function buildVisitLogFilters(query) {
     params.push(visitor_type.toLowerCase());
   }
 
-  if (department && department !== "all") {
-    whereClause += " AND ll.visitor_type IN ('student', 'sport') AND s.department = ?";
-    params.push(department);
+  const studentCourse = course || department;
+
+  if (studentCourse && studentCourse !== "all") {
+    whereClause += " AND ll.visitor_type IN ('student', 'sport') AND s.course = ?";
+    params.push(studentCourse);
   }
 
   if (use_computer && use_computer !== "all") {
@@ -123,8 +126,8 @@ function buildVisitLogFilters(query) {
   }
 
   if (search) {
-    whereClause += " AND (ll.visitor_name LIKE ? OR ll.roll_no LIKE ?)";
-    params.push(`%${search}%`, `%${search}%`);
+    whereClause += " AND (ll.visitor_name LIKE ? OR ll.roll_no LIKE ? OR ll.sport_name LIKE ?)";
+    params.push(`%${search}%`, `%${search}%`, `%${search}%`);
   }
 
   return { baseQuery, whereClause, params };
@@ -155,6 +158,26 @@ function getMonthlyFootfallData() {
     WHERE visit_date IS NOT NULL
     GROUP BY YEAR(visit_date), MONTH(visit_date)
     ORDER BY YEAR(visit_date), MONTH(visit_date)
+  `;
+
+  return db.promise().query(query);
+}
+
+function getSportUsageData() {
+  const query = `
+    SELECT
+      YEAR(visit_date) AS year,
+      MONTH(visit_date) AS month,
+      DATE_FORMAT(MIN(visit_date), '%b %Y') AS month_label,
+      sport_name,
+      COUNT(*) AS usage_count
+    FROM library_logs
+    WHERE visitor_type = 'sport'
+      AND sport_name IS NOT NULL
+      AND sport_name <> ''
+      AND visit_date IS NOT NULL
+    GROUP BY YEAR(visit_date), MONTH(visit_date), sport_name
+    ORDER BY YEAR(visit_date), MONTH(visit_date), sport_name
   `;
 
   return db.promise().query(query);
@@ -308,11 +331,16 @@ router.get("/monthly-footfall", async (req, res) => {
 ========================= */
 router.get("/monthly-footfall-report", async (req, res) => {
   try {
-    const [rows] = await getMonthlyFootfallData();
+    const [[rows], [sportUsageRows]] = await Promise.all([
+      getMonthlyFootfallData(),
+      getSportUsageData()
+    ]);
     const worksheetData = [
       [
         "Month",
         "Student Visits",
+        "Sport Visits",
+        "Computer Visits",
         "Staff Visits",
         "Guest Visits",
         "Total Visits"
@@ -320,27 +348,49 @@ router.get("/monthly-footfall-report", async (req, res) => {
       ...rows.map((row) => ([
         row.month_label,
         row.student_visits || 0,
+        row.sport_visits || 0,
+        row.computer_visits || 0,
         row.staff_visits || 0,
         row.guest_visits || 0,
         row.total_visits || 0
       ]))
     ];
+    const sportUsageWorksheetData = [
+      ["Month", "Sport Item", "Usage Count"],
+      ...sportUsageRows.map((row) => ([
+        row.month_label,
+        row.sport_name,
+        row.usage_count || 0
+      ]))
+    ];
 
     const workbook = xlsx.utils.book_new();
     const worksheet = xlsx.utils.aoa_to_sheet(worksheetData);
+    const sportUsageWorksheet = xlsx.utils.aoa_to_sheet(sportUsageWorksheetData);
 
     worksheet["!cols"] = [
       { wch: 18 },
+      { wch: 16 },
+      { wch: 14 },
       { wch: 16 },
       { wch: 14 },
       { wch: 14 },
       { wch: 14 }
     ];
     worksheet["!autofilter"] = {
-      ref: `A1:E${Math.max(worksheetData.length, 1)}`
+      ref: `A1:G${Math.max(worksheetData.length, 1)}`
+    };
+    sportUsageWorksheet["!cols"] = [
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 14 }
+    ];
+    sportUsageWorksheet["!autofilter"] = {
+      ref: `A1:C${Math.max(sportUsageWorksheetData.length, 1)}`
     };
 
     xlsx.utils.book_append_sheet(workbook, worksheet, "Monthly Footfall");
+    xlsx.utils.book_append_sheet(workbook, sportUsageWorksheet, "Sport Item Usage");
 
     const fileBuffer = xlsx.write(workbook, {
       type: "buffer",
@@ -479,11 +529,16 @@ router.get("/visit-logs", (req, res) => {
     ll.visitor_type,
     ll.visitor_name,
     ll.roll_no,
+    ll.sport_name,
 
     CASE 
-      WHEN ll.visitor_type IN ('student', 'sport') THEN s.department
+      WHEN ll.visitor_type IN ('student', 'sport') THEN s.course
       ELSE NULL
     END AS department,
+    CASE 
+      WHEN ll.visitor_type IN ('student', 'sport') THEN s.course
+      ELSE NULL
+    END AS course,
 
     ll.entry_time,
     ll.exit_time,
@@ -536,10 +591,19 @@ router.get("/export-logs", async (req, res) => {
         ll.visitor_type,
         ll.visitor_name,
         ll.roll_no,
+        ll.sport_name,
+        CASE
+          WHEN ll.visitor_type IN ('student', 'sport') THEN s.course
+          ELSE NULL
+        END AS department,
         ll.entry_time,
         ll.exit_time,
         ll.visit_date,
-        ll.use_computer
+        ll.use_computer,
+        CASE
+          WHEN ll.exit_time IS NULL THEN 'Inside'
+          ELSE 'Exited'
+        END AS status
       ${baseQuery}
       ${whereClause}
       ORDER BY ll.entry_time DESC
@@ -550,10 +614,13 @@ router.get("/export-logs", async (req, res) => {
       "visitor_type",
       "visitor_name",
       "roll_no",
+      "sport_name",
+      "department",
       "entry_time",
       "exit_time",
       "visit_date",
-      "use_computer"
+      "use_computer",
+      "status"
     ];
 
     const csvLines = [

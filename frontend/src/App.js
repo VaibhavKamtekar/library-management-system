@@ -13,6 +13,7 @@ import Message from "./components/Message";
 // Admin screens
 import AdminLogin from "./components/AdminLogin";
 import AdminDashboard from "./components/AdminDashboard";
+import AdminStudentManagement from "./components/AdminStudentManagement";
 
 function App() {
   const [mode, setMode] = useState(() => localStorage.getItem("library-theme") || "light");
@@ -23,8 +24,12 @@ function App() {
   // stores current user info (student/staff/guest)
   const [user, setUser] = useState({});
 
-  // message after IN / OUT
-  const [message, setMessage] = useState("");
+  // confirmation details after IN / OUT
+  const [confirmation, setConfirmation] = useState({
+    status: "",
+    message: "",
+    details: {}
+  });
 
   useEffect(() => {
     localStorage.setItem("library-theme", mode);
@@ -99,13 +104,13 @@ function App() {
         <InOut
           {...commonScreenProps}
           user={user}
-          setMessage={setMessage}
+          setConfirmation={setConfirmation}
         />
       )}
 
       {/* MESSAGE */}
       {screen === "message" && (
-        <Message {...commonScreenProps} message={message} user={user} />
+        <Message {...commonScreenProps} confirmation={confirmation} user={user} />
       )}
 
 
@@ -117,6 +122,11 @@ function App() {
       {/* ADMIN DASHBOARD */}
       {screen === "adminDashboard" && (
         <AdminDashboard {...commonScreenProps} />
+      )}
+
+      {/* ADMIN STUDENT MANAGEMENT */}
+      {screen === "adminStudentManagement" && (
+        <AdminStudentManagement {...commonScreenProps} />
       )}
     </ThemeProvider>
   );

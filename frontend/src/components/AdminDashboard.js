@@ -50,7 +50,6 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   const [totalPages, setTotalPages] = useState(1);
   const [totalLogs, setTotalLogs] = useState(0);
   const [pageLimit] = useState(10);
-  const [file, setFile] = useState(null);
   const [uploadMsg, setUploadMsg] = useState("");
   const [dashboardLoading, setDashboardLoading] = useState(true);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -132,28 +131,6 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
     loadLogs();
   }, [filters, currentPage, pageLimit]);
 
-  const handleUpload = async () => {
-    if (!file) {
-      setUploadMsg("Select an Excel file before uploading.");
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const res = await axios.post(
-        "http://localhost:5000/api/admin/upload-students",
-        formData,
-        { headers: { "Content-Type": "multipart/form-data" } }
-      );
-
-      setUploadMsg(`${res.data.inserted} students uploaded successfully.`);
-    } catch (err) {
-      setUploadMsg("Excel upload failed.");
-    }
-  };
-
   const handleExportLogs = async () => {
     try {
       const params = buildLogQueryParams(filters);
@@ -221,13 +198,48 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   );
   const insideFilterActive = filters.status === "inside";
   const summaryCards = [
-    { label: "Total Entries Today", value: summary.total, accent: "linear-gradient(135deg, #1d4ed8, #60a5fa)" },
-    { label: "Students", value: summary.students, accent: "linear-gradient(135deg, #0f766e, #34d399)" },
-    { label: "Sport", value: summary.sport, accent: "linear-gradient(135deg, #dc2626, #fb7185)" },
-    { label: "Computer Usage", value: summary.computer, accent: "linear-gradient(135deg, #ea580c, #fdba74)" },
-    { label: "Staff", value: summary.staff, accent: "linear-gradient(135deg, #b45309, #f59e0b)" },
-    { label: "Guests", value: summary.guests, accent: "linear-gradient(135deg, #7c3aed, #c084fc)" },
-    { label: "Currently Inside", value: currentlyInside, accent: "linear-gradient(135deg, #be123c, #fb7185)" }
+    {
+      label: "Total Entries Today",
+      value: summary.total,
+      hint: "All recorded visits for today",
+      accent: "linear-gradient(135deg, #1d4ed8, #60a5fa)"
+    },
+    {
+      label: "Students",
+      value: summary.students,
+      hint: "Regular student entries",
+      accent: "linear-gradient(135deg, #0f766e, #34d399)"
+    },
+    {
+      label: "Sport",
+      value: summary.sport,
+      hint: "Sport-item usage entries",
+      accent: "linear-gradient(135deg, #dc2626, #fb7185)"
+    },
+    {
+      label: "Computer Usage",
+      value: summary.computer,
+      hint: "Students using computers",
+      accent: "linear-gradient(135deg, #ea580c, #fdba74)"
+    },
+    {
+      label: "Staff",
+      value: summary.staff,
+      hint: "Staff member visits",
+      accent: "linear-gradient(135deg, #b45309, #f59e0b)"
+    },
+    {
+      label: "Guests",
+      value: summary.guests,
+      hint: "Guest entries logged today",
+      accent: "linear-gradient(135deg, #7c3aed, #c084fc)"
+    },
+    {
+      label: "Currently Inside",
+      value: currentlyInside,
+      hint: insideFilterActive ? "Inside-only filter is active" : "Click to view active sessions",
+      accent: "linear-gradient(135deg, #be123c, #fb7185)"
+    }
   ];
 
   const handleCurrentlyInsideClick = () => {
@@ -268,12 +280,19 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                   Library operations
                 </Typography>
                 <Typography sx={heroBodySx}>
-                  Monitor daily traffic, review timestamps, filter visit logs, and manage student data upload from one place.
+                  Monitor daily traffic, review timestamps, filter visit logs, and jump into student management for record updates and bulk uploads.
                 </Typography>
               </Box>
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5}>
                 <ThemeToggleButton mode={mode} onToggle={onToggleMode} />
+                <Button
+                  variant="contained"
+                  sx={studentManagementButtonSx}
+                  onClick={() => setScreen("adminStudentManagement")}
+                >
+                  Student Management
+                </Button>
                 <Button variant="outlined" sx={refreshButtonSx} onClick={() => setFilters((prev) => ({ ...prev }))}>
                   Refresh Logs
                 </Button>
@@ -288,48 +307,26 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
           {error && <Alert severity="error">{error}</Alert>}
           {uploadMsg && <Alert severity={uploadMsg.includes("failed") ? "error" : "success"}>{uploadMsg}</Alert>}
 
-          <Grid container spacing={2}>
+          <Box sx={summaryGridSx}>
             {summaryCards.map((item) => (
-              <Grid
-                item
-                xs={12}
-                sm={6}
-                lg={item.label === "Currently Inside" ? 12 : 3}
-                xl={item.label === "Currently Inside" ? 3 : undefined}
+              <Paper
                 key={item.label}
+                onClick={item.label === "Currently Inside" ? handleCurrentlyInsideClick : undefined}
+                sx={metricCardSx(item.accent, item.label === "Currently Inside", insideFilterActive)}
               >
-                <Paper
-                  onClick={item.label === "Currently Inside" ? handleCurrentlyInsideClick : undefined}
-                  sx={{
-                    ...cardSx,
-                    background: item.accent,
-                    cursor: item.label === "Currently Inside" ? "pointer" : "default",
-                    transform: item.label === "Currently Inside" && insideFilterActive ? "translateY(-2px)" : "none",
-                    boxShadow:
-                      item.label === "Currently Inside" && insideFilterActive
-                        ? "0 0 0 3px rgba(255,255,255,0.35), 0 18px 40px rgba(15, 23, 42, 0.18)"
-                        : cardSx.boxShadow,
-                    transition: "transform 160ms ease, box-shadow 160ms ease",
-                    "&:hover":
-                      item.label === "Currently Inside"
-                        ? {
-                            transform: "translateY(-2px)",
-                            boxShadow: "0 18px 40px rgba(15, 23, 42, 0.18)"
-                          }
-                        : undefined
-                  }}
-                >
-                  <Typography sx={metricLabelSx}>{item.label}</Typography>
-                  <Typography variant="h4" sx={metricValueSx}>
+                <Box>
+                  <Typography sx={metricCardLabelSx}>{item.label}</Typography>
+                  <Typography variant="h4" sx={metricCardValueSx}>
                     {item.value}
                   </Typography>
-                </Paper>
-              </Grid>
+                </Box>
+                <Typography sx={metricCardHintSx}>{item.hint}</Typography>
+              </Paper>
             ))}
-          </Grid>
+          </Box>
 
           <Grid container spacing={2}>
-            <Grid item xs={12} lg={8}>
+            <Grid item xs={12}>
               <Paper sx={panelSx}>
                 <Typography variant="h6" sx={panelTitleSx}>
                   Visit log filters
@@ -386,7 +383,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                   <Grid item xs={12} sm={6} md={3}>
                     <FilterField
                       title="Visitor Type"
-                      helper="Switch between student, staff, and guest"
+                      helper="Switch between student, sport, staff, and guest entries"
                       field={
                         <TextField
                           select
@@ -398,6 +395,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                         >
                           <MenuItem value="all">All</MenuItem>
                           <MenuItem value="student">Student</MenuItem>
+                          <MenuItem value="sport">Sport</MenuItem>
                           <MenuItem value="staff">Staff</MenuItem>
                           <MenuItem value="guest">Guest</MenuItem>
                         </TextField>
@@ -447,7 +445,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                   <Grid item xs={12} md={4}>
                     <FilterField
                       title="Search"
-                      helper="Search by visitor name or roll number"
+                      helper="Search by visitor name, roll number, or sport item"
                       field={
                         <TextField
                           label="Name or Roll Number"
@@ -510,38 +508,6 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
               </Paper>
             </Grid>
 
-            <Grid item xs={12} lg={4}>
-              <Paper sx={panelSx}>
-                <Typography variant="h6" sx={panelTitleSx}>
-                  Upload students
-                </Typography>
-                <Typography sx={panelTextSx}>
-                  Upload an Excel file containing roll number, name, year, and department columns.
-                </Typography>
-                <Stack direction={{ xs: "column", sm: "row" }} spacing={1.5} sx={{ mt: 2 }}>
-                  <Button
-                    component="a"
-                    href="/student-upload-template.csv"
-                    download
-                    variant="outlined"
-                    sx={downloadButtonSx}
-                  >
-                    Download Template
-                  </Button>
-                </Stack>
-                <Box sx={{ mt: 2 }}>
-                  <input
-                    type="file"
-                    accept=".xlsx"
-                    onChange={(e) => setFile(e.target.files[0])}
-                    style={{ width: "100%" }}
-                  />
-                </Box>
-                <Button variant="contained" sx={uploadButtonSx} onClick={handleUpload}>
-                  Upload Excel File
-                </Button>
-              </Paper>
-            </Grid>
           </Grid>
 
           <Paper sx={panelSx}>
@@ -574,6 +540,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                     <TableCell>Visitor Type</TableCell>
                     <TableCell>Name</TableCell>
                     <TableCell>Roll No</TableCell>
+                    <TableCell>Sport Item</TableCell>
                     <TableCell>Department</TableCell>
                     <TableCell>Visit Date</TableCell>
                     <TableCell>Entry Time</TableCell>
@@ -585,16 +552,17 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                 <TableBody>
                   {logs.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                      <TableCell colSpan={10} align="center" sx={{ py: 4, color: "text.secondary" }}>
                         No visit logs found for the selected filters.
                       </TableCell>
                     </TableRow>
                   )}
                   {logs.map((log) => (
                     <TableRow key={log.log_id} hover>
-                      <TableCell sx={{ textTransform: "capitalize" }}>{log.visitor_type}</TableCell>
+                      <TableCell sx={{ textTransform: "capitalize" }}>{formatVisitorType(log.visitor_type)}</TableCell>
                       <TableCell>{log.visitor_name || "-"}</TableCell>
                       <TableCell>{log.roll_no || "-"}</TableCell>
+                      <TableCell>{log.sport_name || "-"}</TableCell>
                       <TableCell>{log.department || "-"}</TableCell>
                       <TableCell>{formatDate(log.visit_date)}</TableCell>
                       <TableCell>{formatDateTime(log.entry_time)}</TableCell>
@@ -700,10 +668,10 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                 >
                   <Box>
                     <Typography variant="h6" sx={panelTitleSx}>
-                      Monthly student footfall
+                      Monthly footfall overview
                     </Typography>
                     <Typography sx={panelTextSx}>
-                      Download a month-wise Excel report with student, staff, guest, and total visit counts.
+                      Download a month-wise Excel report with student, sport, computer, staff, guest, and sport-item usage details.
                     </Typography>
                   </Box>
                   <Button
@@ -751,6 +719,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                 </Typography>
                 <Divider sx={{ my: 2 }} />
                 <MetricRow label="Students Logged" value={footfall.total_students} />
+                <MetricRow label="Sport Entries" value={summary.sport} />
                 <MetricRow label="Using Computer" value={footfall.computer_users} />
                 <MetricRow label="Not Using Computer" value={footfall.non_computer_users} />
                 <MetricRow label="Peak Hour" value={peakHour?.hour !== undefined ? `${peakHour.hour}:00` : "No data"} />
@@ -891,6 +860,14 @@ function getRelativeDateValue(offsetDays) {
   return `${year}-${month}-${day}`;
 }
 
+function formatVisitorType(value) {
+  if (!value) {
+    return "-";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function MetricRow({ label, value }) {
   return (
     <Stack direction="row" justifyContent="space-between" sx={{ py: 0.8 }}>
@@ -955,12 +932,33 @@ const heroSx = {
   boxShadow: "0 18px 50px rgba(15, 23, 42, 0.06)"
 };
 
-const cardSx = {
+const summaryGridSx = {
+  display: "grid",
+  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+  gap: 16
+};
+
+const metricCardSx = (accent, isInteractive, isActive) => ({
   p: 3,
+  minHeight: 156,
+  display: "flex",
+  flexDirection: "column",
+  justifyContent: "space-between",
   borderRadius: 4,
   color: "#ffffff",
-  boxShadow: "0 16px 36px rgba(15, 23, 42, 0.08)"
-};
+  background: accent,
+  boxShadow: isActive
+    ? "0 0 0 3px rgba(255,255,255,0.28), 0 22px 44px rgba(15, 23, 42, 0.18)"
+    : "0 16px 36px rgba(15, 23, 42, 0.12)",
+  cursor: isInteractive ? "pointer" : "default",
+  transition: "transform 160ms ease, box-shadow 160ms ease",
+  "&:hover": isInteractive
+    ? {
+        transform: "translateY(-2px)",
+        boxShadow: "0 22px 44px rgba(15, 23, 42, 0.18)"
+      }
+    : undefined
+});
 
 const panelSx = {
   p: 3,
@@ -972,18 +970,27 @@ const panelSx = {
   boxShadow: "0 12px 28px rgba(15, 23, 42, 0.05)"
 };
 
-const metricLabelSx = {
+const metricCardLabelSx = {
   color: "rgba(255,255,255,0.82)",
-  fontSize: 13,
+  fontSize: 12,
   textTransform: "uppercase",
-  letterSpacing: 1.2
+  letterSpacing: 1.4,
+  fontWeight: 700
 };
 
-const metricValueSx = {
-  mt: 1.25,
+const metricCardValueSx = {
+  mt: 1.4,
   color: "#ffffff",
   fontWeight: 800,
-  fontFamily: '"Trebuchet MS", "Segoe UI", sans-serif'
+  fontFamily: '"Trebuchet MS", "Segoe UI", sans-serif',
+  lineHeight: 1
+};
+
+const metricCardHintSx = {
+  mt: 2,
+  fontSize: 12,
+  lineHeight: 1.55,
+  color: "rgba(255,255,255,0.88)"
 };
 
 const panelTitleSx = {
@@ -1029,12 +1036,15 @@ const listRowSx = {
   borderColor: "divider"
 };
 
-const uploadButtonSx = {
-  mt: 2,
-  py: 1.2,
+const studentManagementButtonSx = {
+  py: 1.15,
+  px: 2.2,
   borderRadius: 3,
   fontWeight: 700,
-  background: "#2563eb"
+  background: "#1d4ed8",
+  "&:hover": {
+    background: "#1e40af"
+  }
 };
 
 const reportButtonSx = {
@@ -1121,18 +1131,6 @@ const actionChipSx = {
   borderColor: (theme) => (theme.palette.mode === "dark" ? "#264766" : "#cfe0fb"),
   "&:hover": {
     background: (theme) => (theme.palette.mode === "dark" ? "#1b2d49" : "#dce9ff")
-  }
-};
-
-const downloadButtonSx = {
-  py: 1.1,
-  borderRadius: 3,
-  fontWeight: 700,
-  borderColor: "divider",
-  color: "text.primary",
-  "&:hover": {
-    borderColor: "primary.main",
-    background: "action.hover"
   }
 };
 

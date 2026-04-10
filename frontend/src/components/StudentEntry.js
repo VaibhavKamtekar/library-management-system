@@ -32,16 +32,23 @@ export default function StudentEntry({ setScreen, setUser, mode, onToggleMode })
         type: "student",
         name: res.data.name,
         rollNo,
-        department: res.data.department
+        course: res.data.course,
+        department: res.data.department || res.data.course
       });
 
       setScreen("inout");
     } catch (err) {
+      if (err.response?.data?.message) {
+        setError(err.response.data.message);
+        return;
+      }
+
       if (err.response?.status === 404) {
         setError("Student not found. Check the roll number and try again.");
-      } else {
-        setError("Unable to validate student details right now.");
+        return;
       }
+
+      setError("Unable to validate student details right now.");
     }
   };
 

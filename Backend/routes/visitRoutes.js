@@ -1,6 +1,26 @@
 const router = require("express").Router();
 const db = require("../db");
 
+function formatDuration(entryTime, exitTime) {
+  const start = new Date(entryTime);
+  const end = new Date(exitTime);
+  const durationMs = Math.max(0, end.getTime() - start.getTime());
+  const totalMinutes = Math.floor(durationMs / 60000);
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${String(minutes).padStart(2, "0")}m`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${String(minutes).padStart(2, "0")}m`;
+  }
+
+  return `${totalMinutes}m`;
+}
+
 router.post("/", async (req, res) => {
   const { type, use_computer, sport } = req.body;
   const dbPromise = db.promise();
@@ -16,7 +36,7 @@ router.post("/", async (req, res) => {
   try {
     let visitorName = "";
     let rollNo = null;
-    let department = null;
+    let course = null;
     let sessionUseComputer = "NO";
     let sportName = null;
     let activeWhere = "";
@@ -42,7 +62,7 @@ router.post("/", async (req, res) => {
       }
 
       const [students] = await dbPromise.query(
-        "SELECT name, department, roll_no FROM students WHERE roll_no = ?",
+        "SELECT name, course, roll_no, status FROM students WHERE roll_no = ?",
         [roll_no]
       );
 
@@ -54,8 +74,16 @@ router.post("/", async (req, res) => {
         });
       }
 
+      if (students[0].status !== "active") {
+        return res.status(403).json({
+          status: "ERROR",
+          message: "Only active students are allowed for entry.",
+          data: {}
+        });
+      }
+
       visitorName = students[0].name;
-      department = students[0].department;
+      course = students[0].course;
       rollNo = students[0].roll_no;
       sessionUseComputer = type === "student" ? use_computer || "NO" : "NO";
       sportName = type === "sport" ? sport : null;
@@ -109,11 +137,16 @@ router.post("/", async (req, res) => {
     }
 
     const [activeSessions] = await dbPromise.query(
-      `SELECT log_id, entry_time, visit_date FROM library_logs WHERE ${activeWhere}`,
+      `SELECT log_id, entry_time, visit_date
+       FROM library_logs
+       WHERE ${activeWhere}
+       ORDER BY entry_time ASC, log_id ASC`,
       activeParams
     );
 
     if (activeSessions.length > 0) {
+      const summarySession = activeSessions[0];
+
       if (rollNo) {
         await dbPromise.query(
           "UPDATE library_logs SET exit_time = NOW() WHERE roll_no = ? AND exit_time IS NULL",
@@ -129,6 +162,16 @@ router.post("/", async (req, res) => {
         );
       }
 
+      const [closedSessionRows] = await dbPromise.query(
+        `SELECT log_id, entry_time, exit_time
+         FROM library_logs
+         WHERE log_id = ?
+         LIMIT 1`,
+        [summarySession.log_id]
+      );
+
+      const closedSession = closedSessionRows[0];
+
       return res.status(200).json({
         status: "EXIT",
         message: `${type} exit recorded successfully.`,
@@ -136,8 +179,16 @@ router.post("/", async (req, res) => {
           type,
           visitor_name: visitorName,
           roll_no: rollNo,
-          department,
-          closed_sessions: activeSessions.length
+          course,
+          department: course,
+          closed_sessions: activeSessions.length,
+          entry_time: closedSession?.entry_time || summarySession.entry_time,
+          exit_time: closedSession?.exit_time || null,
+          duration:
+            closedSession?.entry_time && closedSession?.exit_time
+              ? formatDuration(closedSession.entry_time, closedSession.exit_time)
+              : "0m",
+          is_auto_exit: false
         }
       });
     }
@@ -175,7 +226,8 @@ router.post("/", async (req, res) => {
         type,
         visitor_name: visitorName,
         roll_no: rollNo,
-        department,
+        course,
+        department: course,
         use_computer: type === "student" ? sessionUseComputer : null,
         sport: sportName
       }

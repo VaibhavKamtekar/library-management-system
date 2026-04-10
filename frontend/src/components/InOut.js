@@ -16,7 +16,7 @@ import {
 } from "@mui/material";
 import OperationalLayout from "./OperationalLayout";
 
-export default function InOut({ user, setMessage, setScreen, mode, onToggleMode }) {
+export default function InOut({ user, setConfirmation, setScreen, mode, onToggleMode }) {
   const [useComputer, setUseComputer] = useState("NO");
   const [sport, setSport] = useState("");
   const [error, setError] = useState("");
@@ -74,7 +74,11 @@ export default function InOut({ user, setMessage, setScreen, mode, onToggleMode 
       }
 
       const res = await axios.post("http://localhost:5000/api/visit", data);
-      setMessage(res.data.status === "ENTRY" ? "Entry recorded" : "Exit recorded");
+      setConfirmation({
+        status: res.data.status,
+        message: res.data.status === "ENTRY" ? "Entry recorded" : "Exit recorded",
+        details: res.data.data || {}
+      });
       setScreen("message");
     } catch (err) {
       if (err.response?.status === 404) {

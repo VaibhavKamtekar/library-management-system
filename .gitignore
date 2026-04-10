@@ -1,0 +1,15 @@
+# Root dependencies and temporary workspace files
+/node_modules/
+/tmp/
+
+# Backend dependencies should be installed locally, not tracked
+/Backend/node_modules/
+
+# Local environment and logs
+.env
+.env.*
+*.log
+
+# Accidental npm artifacts created from the repo root
+/package.json
+/package-lock.json

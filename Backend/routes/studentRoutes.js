@@ -5,13 +5,17 @@ router.post("/in", (req, res) => {
   const { roll_no, use_computer } = req.body;
 
   db.query(
-    "SELECT name, department FROM students WHERE roll_no=?",
+    "SELECT name, course, status FROM students WHERE roll_no=?",
     [roll_no],
     (err, result) => {
       if (err) return res.status(500).json(err);
 
       if (result.length === 0)
         return res.status(404).json({ message: "Student not found" });
+
+      if (result[0].status !== "active") {
+        return res.status(403).json({ message: "Only active students are allowed for entry." });
+      }
 
       db.query(
         `INSERT INTO library_logs 
@@ -30,7 +34,7 @@ router.post("/validate", (req, res) => {
   const { roll_no } = req.body;
 
   db.query(
-    "SELECT name, department FROM students WHERE roll_no=?",
+    "SELECT name, course, status FROM students WHERE roll_no=?",
     [roll_no],
     (err, result) => {
       if (err) return res.status(500).json(err);
@@ -39,9 +43,14 @@ router.post("/validate", (req, res) => {
         return res.status(404).json({ message: "Student not found" });
       }
 
+      if (result[0].status !== "active") {
+        return res.status(403).json({ message: "Only active students are allowed for entry." });
+      }
+
       res.json({
         name: result[0].name,
-        department: result[0].department
+        course: result[0].course,
+        department: result[0].course
       });
     }
   );
