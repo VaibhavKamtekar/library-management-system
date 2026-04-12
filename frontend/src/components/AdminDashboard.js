@@ -42,7 +42,6 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
     non_computer_users: 0
   });
   const [monthlyFootfall, setMonthlyFootfall] = useState([]);
-  const [studentTime, setStudentTime] = useState([]);
   const [totalTime, setTotalTime] = useState(0);
   const [peakHour, setPeakHour] = useState(null);
   const [logs, setLogs] = useState([]);
@@ -56,6 +55,7 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   const [error, setError] = useState("");
   const [logError, setLogError] = useState("");
   const [filters, setFilters] = useState(getDefaultLogFilters);
+  const [studentTimeToday, setStudentTimeToday] = useState([]);
 
   useEffect(() => {
     const loadDashboard = async () => {
@@ -68,29 +68,29 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
           leaderboardRes,
           footfallRes,
           monthlyRes,
-          studentTimeRes,
           totalTimeRes,
           peakHourRes,
-          currentlyInsideRes
+          currentlyInsideRes,
+          studentTimeRes
         ] = await Promise.all([
           axios.get("http://localhost:5000/api/admin/dashboard"),
           axios.get("http://localhost:5000/api/admin/leaderboard"),
           axios.get("http://localhost:5000/api/admin/footfall"),
           axios.get("http://localhost:5000/api/admin/monthly-footfall"),
-          axios.get("http://localhost:5000/api/admin/student-time-today"),
           axios.get("http://localhost:5000/api/admin/total-time-today"),
           axios.get("http://localhost:5000/api/admin/peak-hour"),
-          axios.get("http://localhost:5000/api/admin/currently-inside")
+          axios.get("http://localhost:5000/api/admin/currently-inside"),
+          axios.get("http://localhost:5000/api/admin/student-time-today")
         ]);
 
         setSummary(summaryRes.data);
         setLeaderboard(leaderboardRes.data);
         setFootfall(footfallRes.data);
         setMonthlyFootfall(monthlyRes.data);
-        setStudentTime(studentTimeRes.data);
         setTotalTime(totalTimeRes.data?.total_minutes || 0);
         setPeakHour(peakHourRes.data);
         setCurrentlyInside(currentlyInsideRes.data?.count || 0);
+        setStudentTimeToday(studentTimeRes.data || []);
       } catch (err) {
         setError("Dashboard analytics could not be loaded.");
       } finally {
@@ -198,49 +198,49 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
   );
   const insideFilterActive = filters.status === "inside";
   const summaryCards = [
-    {
-      label: "Total Entries Today",
-      value: summary.total,
-      hint: "All recorded visits for today",
-      accent: "linear-gradient(135deg, #1d4ed8, #60a5fa)"
-    },
-    {
-      label: "Students",
-      value: summary.students,
-      hint: "Regular student entries",
-      accent: "linear-gradient(135deg, #0f766e, #34d399)"
-    },
-    {
-      label: "Sport",
-      value: summary.sport,
-      hint: "Sport-item usage entries",
-      accent: "linear-gradient(135deg, #dc2626, #fb7185)"
-    },
-    {
-      label: "Computer Usage",
-      value: summary.computer,
-      hint: "Students using computers",
-      accent: "linear-gradient(135deg, #ea580c, #fdba74)"
-    },
-    {
-      label: "Staff",
-      value: summary.staff,
-      hint: "Staff member visits",
-      accent: "linear-gradient(135deg, #b45309, #f59e0b)"
-    },
-    {
-      label: "Guests",
-      value: summary.guests,
-      hint: "Guest entries logged today",
-      accent: "linear-gradient(135deg, #7c3aed, #c084fc)"
-    },
-    {
-      label: "Currently Inside",
-      value: currentlyInside,
-      hint: insideFilterActive ? "Inside-only filter is active" : "Click to view active sessions",
-      accent: "linear-gradient(135deg, #be123c, #fb7185)"
-    }
-  ];
+  {
+    label: "Total Entries Today",
+    value: summary.total,
+    hint: "All recorded visits for today",
+    accent: "linear-gradient(135deg, #2563eb, #60a5fa)" // BLUE
+  },
+  {
+    label: "Students",
+    value: summary.students,
+    hint: "Regular student entries",
+    accent: "linear-gradient(135deg, #0f766e, #34d399)" // GREEN
+  },
+  {
+    label: "Sport",
+    value: summary.sport,
+    hint: "Sport-item usage entries",
+    accent: "linear-gradient(135deg, #dc2626, #fb7185)" // RED
+  },
+  {
+    label: "Computer Usage",
+    value: summary.computer,
+    hint: "Students using computers",
+    accent: "linear-gradient(135deg, #ea580c, #fdba74)" // ORANGE
+  },
+  {
+    label: "Staff",
+    value: summary.staff,
+    hint: "Staff member visits",
+    accent: "linear-gradient(135deg, #b45309, #f59e0b)" // DARK ORANGE
+  },
+  {
+    label: "Guests",
+    value: summary.guests,
+    hint: "Guest entries logged today",
+    accent: "linear-gradient(135deg, #7c3aed, #c084fc)" // PURPLE
+  },
+  {
+    label: "Currently Inside",
+    value: currentlyInside,
+    hint: "Students Inside Library",
+    accent: "linear-gradient(135deg, #be123c, #fb7185)" // PINK RED
+  }
+];
 
   const handleCurrentlyInsideClick = () => {
     setFilters((prev) => ({
@@ -320,7 +320,9 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
                     {item.value}
                   </Typography>
                 </Box>
-                <Typography sx={metricCardHintSx}>{item.hint}</Typography>
+                <Typography sx={metricCardHintSx}>
+                                {item.hint}
+                </Typography>
               </Paper>
             ))}
           </Box>
@@ -616,48 +618,6 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
           </Paper>
 
           <Grid container spacing={2}>
-            <Grid item xs={12} lg={6}>
-              <Paper sx={panelSx}>
-                <Typography variant="h6" sx={panelTitleSx}>
-                  Student leaderboard
-                </Typography>
-                <Stack spacing={1.2} sx={{ mt: 2 }}>
-                  {leaderboard.slice(0, 8).map((item, index) => (
-                    <Box key={`${item.roll_no}-${index}`} sx={listRowSx}>
-                      <Typography sx={{ color: "text.primary", fontWeight: 600 }}>
-                        {index + 1}. {item.visitor_name}
-                      </Typography>
-                      <Typography sx={{ color: "text.secondary" }}>
-                        {item.roll_no || "-"} | {item.visits} visits
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </Paper>
-            </Grid>
-
-            <Grid item xs={12} lg={6}>
-              <Paper sx={panelSx}>
-                <Typography variant="h6" sx={panelTitleSx}>
-                  Time spent today
-                </Typography>
-                <Stack spacing={1.2} sx={{ mt: 2 }}>
-                  {studentTime.slice(0, 8).map((item, index) => (
-                    <Box key={`${item.roll_no}-${index}`} sx={listRowSx}>
-                      <Typography sx={{ color: "text.primary", fontWeight: 600 }}>
-                        {item.visitor_name}
-                      </Typography>
-                      <Typography sx={{ color: "text.secondary" }}>
-                        {item.roll_no || "-"} | {item.minutes_spent} minutes
-                      </Typography>
-                    </Box>
-                  ))}
-                </Stack>
-              </Paper>
-            </Grid>
-          </Grid>
-
-          <Grid container spacing={2}>
             <Grid item xs={12} lg={7}>
               <Paper sx={panelSx}>
                 <Stack
@@ -743,6 +703,37 @@ export default function AdminDashboard({ setScreen, mode, onToggleMode }) {
               </Paper>
             </Grid>
           </Grid>
+
+          <Paper sx={panelSx}>
+            <Typography variant="h6" sx={panelTitleSx}>
+              Time spent today
+            </Typography>
+            <Typography sx={panelTextSx}>
+              Top students by total time spent in the library today.
+            </Typography>
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              {studentTimeToday.length === 0 ? (
+                <Typography sx={{ color: "text.secondary" }}>
+                  No student time data available for today.
+                </Typography>
+              ) : (
+                studentTimeToday.slice(0, 6).map((item, index) => (
+                  <Box key={`${item.roll_no}-${index}`} sx={rowInfoSx(theme)}>
+                    <Box>
+                      <Typography sx={{ fontWeight: 700 }}>{item.visitor_name || item.roll_no || "Unknown"}</Typography>
+                      <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                        {item.roll_no || "-"}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontWeight: 700, color: "#1a56db" }}>
+                      {formatMinutes(item.minutes_spent || 0)}
+                    </Typography>
+                  </Box>
+                ))
+              )}
+            </Stack>
+          </Paper>
+
         </Stack>
       </Container>
     </Box>
@@ -934,30 +925,56 @@ const heroSx = {
 
 const summaryGridSx = {
   display: "grid",
-  gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
-  gap: 16
+  gridTemplateColumns: {
+    xs: "repeat(2, 1fr)",
+    sm: "repeat(3, 1fr)",
+    md: "repeat(4, 1fr)",
+    lg: "repeat(7, 1fr)"
+  },
+  gap: 2
 };
-
 const metricCardSx = (accent, isInteractive, isActive) => ({
-  p: 3,
-  minHeight: 156,
+  position: "relative",
+  overflow: "hidden",
+  width: "100%",
+  minHeight: 140,
+  p: 2.5,
+  borderRadius: 3,
+
+  // ✅ REAL GRADIENT BACKGROUND
+  background: accent,
+
+  // ✅ soft glow shadow
+  boxShadow: isActive
+    ? "0 0 0 2px rgba(37, 99, 235, 0.35), 0 10px 25px rgba(0,0,0,0.15)"
+    : "0 8px 20px rgba(0,0,0,0.12)",
+
+  cursor: isInteractive ? "pointer" : "default",
+  transition: "0.25s ease",
+
   display: "flex",
   flexDirection: "column",
   justifyContent: "space-between",
-  borderRadius: 4,
-  color: "#ffffff",
-  background: accent,
-  boxShadow: isActive
-    ? "0 0 0 3px rgba(255,255,255,0.28), 0 22px 44px rgba(15, 23, 42, 0.18)"
-    : "0 16px 36px rgba(15, 23, 42, 0.12)",
-  cursor: isInteractive ? "pointer" : "default",
-  transition: "transform 160ms ease, box-shadow 160ms ease",
-  "&:hover": isInteractive
-    ? {
-        transform: "translateY(-2px)",
-        boxShadow: "0 22px 44px rgba(15, 23, 42, 0.18)"
-      }
-    : undefined
+
+  // ✅ overlay effect (this is what makes it look premium)
+  "&::before": {
+    content: '""',
+    position: "absolute",
+    inset: 0,
+    background: "rgba(255,255,255,0.08)",
+    backdropFilter: "blur(0px)",
+  },
+
+  // keep text above overlay
+  "& > *": {
+    position: "relative",
+    zIndex: 1,
+  },
+
+  "&:hover": {
+    transform: "translateY(-3px)",
+    boxShadow: "0 12px 28px rgba(0,0,0,0.18)",
+  }
 });
 
 const panelSx = {
@@ -971,19 +988,17 @@ const panelSx = {
 };
 
 const metricCardLabelSx = {
-  color: "rgba(255,255,255,0.82)",
   fontSize: 12,
-  textTransform: "uppercase",
-  letterSpacing: 1.4,
-  fontWeight: 700
+  fontWeight: 600,
+  color: "rgba(255,255,255,0.85)",
+  letterSpacing: 0.5,
+  textTransform: "uppercase"
 };
-
 const metricCardValueSx = {
-  mt: 1.4,
-  color: "#ffffff",
+  mt: 1,
+  fontSize: 28,
   fontWeight: 800,
-  fontFamily: '"Trebuchet MS", "Segoe UI", sans-serif',
-  lineHeight: 1
+  color: "#ffffff"
 };
 
 const metricCardHintSx = {
@@ -1152,3 +1167,26 @@ const activePaginationButtonSx = {
   fontWeight: 700,
   background: "#2563eb"
 };
+
+const rowInfoSx = (theme) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  p: 1.5,
+  borderRadius: 3,
+  background: theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.08)" : "#f8fafc"
+});
+
+function formatMinutes(minutes) {
+  const total = Number(minutes || 0);
+  if (total <= 0) return "0m";
+
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${mins}m`;
+  }
+
+  return `${mins}m`;
+}

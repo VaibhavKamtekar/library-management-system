@@ -221,6 +221,27 @@ async function getStudentStats() {
   };
 }
 
+async function getStudentLeaderboard() {
+  const dbPromise = db.promise();
+  const [rows] = await dbPromise.query(`
+      SELECT
+        s.roll_no,
+        s.name AS name,
+        s.name AS visitor_name,
+        s.course,
+        s.academic_year,
+        COUNT(ll.roll_no) AS visits
+      FROM library_logs ll
+      JOIN students s ON ll.roll_no = s.roll_no
+      WHERE ll.visitor_type = 'student'
+      GROUP BY s.roll_no, s.name, s.course, s.academic_year
+      ORDER BY visits DESC
+      LIMIT 10
+    `);
+
+  return rows;
+}
+
 router.get("/students", async (req, res) => {
   try {
     const dbPromise = db.promise();
@@ -263,7 +284,8 @@ router.get("/students", async (req, res) => {
       page,
       totalPages: Math.max(Math.ceil(total / limit), 1),
       stats: await getStudentStats(),
-      courses: courses.map((row) => row.course)
+      courses: courses.map((row) => row.course),
+      leaderboard: await getStudentLeaderboard()
     });
   } catch (error) {
     return res.status(500).json({

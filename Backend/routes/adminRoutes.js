@@ -240,12 +240,15 @@ router.get("/dashboard", (req, res) => {
 router.get("/leaderboard", (req, res) => {
   const query = `
     SELECT 
-      roll_no,
-      visitor_name,
+      ll.roll_no,
+      COALESCE(s.name, ll.visitor_name) AS name,
+      COALESCE(s.course, '') AS course,
+      COALESCE(s.academic_year, '') AS academic_year,
       COUNT(*) AS visits
-    FROM library_logs
-    WHERE visitor_type='student'
-    GROUP BY roll_no, visitor_name
+    FROM library_logs ll
+    LEFT JOIN students s ON ll.roll_no = s.roll_no
+    WHERE ll.visitor_type='student'
+    GROUP BY ll.roll_no, name, course, academic_year
     ORDER BY visits DESC
   `;
 

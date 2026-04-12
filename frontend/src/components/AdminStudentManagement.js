@@ -43,6 +43,7 @@ import {
 import { useTheme } from "@mui/material/styles";
 import ThemeToggleButton from "./ThemeToggleButton";
 
+
 const DEFAULT_FILTERS = {
   academic_year: "all",
   course: "all",
@@ -58,8 +59,10 @@ const EMPTY_ADD_FORM = {
 };
 
 export default function AdminStudentManagement({ setScreen, mode, onToggleMode }) {
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [studentTimeToday, setStudentTimeToday] = useState([]);
   const theme = useTheme();
-  const uploadSectionRef = useRef(null);
+  const uploadSectionRef = useRef(null);  
   const [students, setStudents] = useState([]);
   const [stats, setStats] = useState({
     total: 0,
@@ -121,29 +124,36 @@ export default function AdminStudentManagement({ setScreen, mode, onToggleMode }
   const loadStudents = useCallback(async () => {
     setLoading(true);
     setTableError("");
+  
 
     try {
-      const response = await axios.get("http://localhost:5000/api/admin/students", {
-        params: {
-          ...Object.fromEntries(
-            Object.entries(filters).filter(([, value]) => value && value !== "all")
-          ),
-          page: currentPage,
-          limit: 8
-        }
-      });
+      const [studentsRes, leaderboardRes, timeRes] = await Promise.all([
+        axios.get("http://localhost:5000/api/admin/students", {
+          params: {
+            ...Object.fromEntries(
+              Object.entries(filters).filter(([, value]) => value && value !== "all")
+            ),
+            page: currentPage,
+            limit: 8
+          }
+        }),
+        axios.get("http://localhost:5000/api/admin/leaderboard"),
+        axios.get("http://localhost:5000/api/admin/student-time-today")
+      ]);
 
-      setStudents(response.data.data || []);
+      setStudents(studentsRes.data.data || []);
       setStats((prev) => ({
         ...prev,
-        ...response.data.stats
+        ...studentsRes.data.stats
       }));
-      setCourses(response.data.courses || []);
-      setTotalPages(response.data.totalPages || 1);
-      setTotalStudents(response.data.total || 0);
+      setCourses(studentsRes.data.courses || []);
+      setLeaderboard(leaderboardRes.data);
+      setStudentTimeToday(timeRes.data || []);
+      setTotalPages(studentsRes.data.totalPages || 1);
+      setTotalStudents(studentsRes.data.total || 0);
       setSelectedRollNos((previous) =>
         previous.filter((rollNo) =>
-          (response.data.data || []).some((student) => student.roll_no === rollNo)
+          (studentsRes.data.data || []).some((student) => student.roll_no === rollNo)
         )
       );
     } catch (error) {
@@ -580,6 +590,129 @@ export default function AdminStudentManagement({ setScreen, mode, onToggleMode }
               </Paper>
             ))}
           </Box>
+          <Paper sx={sectionCardSx(theme)}>
+  <Typography sx={sectionTitleSx}>Student Leaderboard</Typography>
+  <Typography sx={sectionSubSx}>
+    Ranked by library activity (based on total visits).
+  </Typography>
+
+  <TableContainer
+    sx={{
+      mt: 2,
+      border: "1px solid",
+      borderColor: "divider",
+      borderRadius: 3,
+      overflowX: "auto"
+    }}
+  >
+    <Table size="small">
+      <TableHead>
+        <TableRow
+          sx={{
+            background: theme.palette.mode === "dark" ? "#172033" : "#f6f8fc"
+          }}
+        >
+          <TableCell>Rank</TableCell>
+          <TableCell>Name</TableCell>
+          <TableCell>Roll No</TableCell>
+          <TableCell>Course</TableCell>
+          <TableCell>Academic Year</TableCell>
+          <TableCell align="right">Visits</TableCell>
+        </TableRow>
+      </TableHead>
+
+      <TableBody>
+        {leaderboard.length === 0 && (
+          <TableRow>
+            <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
+              No leaderboard data available
+            </TableCell>
+          </TableRow>
+        )}
+
+        {leaderboard.map((student, index) => {
+          const isTop3 = index < 3;
+
+          return (
+            <TableRow key={student.roll_no} hover>
+              {/* Rank */}
+              <TableCell sx={{ fontWeight: 800 }}>
+                {index + 1}
+              </TableCell>
+
+              {/* Name */}
+              <TableCell sx={{ fontWeight: 600 }}>
+                {student.name}
+              </TableCell>
+
+              {/* Roll No */}
+              <TableCell sx={{ fontFamily: "monospace" }}>
+                {student.roll_no}
+              </TableCell>
+
+              {/* Course */}
+              <TableCell>{student.course}</TableCell>
+
+              {/* Year */}
+              <TableCell>
+                <Chip
+                  label={student.academic_year}
+                  size="small"
+                  sx={
+                    student.academic_year === "FY"
+                      ? yearChipPrimarySx
+                      : yearChipSecondarySx
+                  }
+                />
+              </TableCell>
+
+              {/* Visits */}
+              <TableCell align="right">
+                <Chip
+                  label={`${student.visits}`}
+                  size="small"
+                  sx={{
+                    background: isTop3 ? "#1a56db" : "#e0e7ff",
+                    color: isTop3 ? "#fff" : "#3730a3",
+                    fontWeight: 700
+                  }}
+                />
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  </TableContainer>
+</Paper>
+
+          <Paper sx={sectionCardSx(theme)}>
+            <Typography sx={sectionTitleSx}>Time spent today</Typography>
+            <Typography sx={sectionSubSx}>
+              Top students by total time spent in the library today.
+            </Typography>
+            <Stack spacing={1} sx={{ mt: 2 }}>
+              {studentTimeToday.length === 0 ? (
+                <Typography sx={{ color: "text.secondary" }}>
+                  No student time data available for today.
+                </Typography>
+              ) : (
+                studentTimeToday.slice(0, 6).map((item, index) => (
+                  <Box key={`${item.roll_no}-${index}`} sx={rowInfoSx(theme)}>
+                    <Box>
+                      <Typography sx={{ fontWeight: 700 }}>{item.visitor_name || item.roll_no || "Unknown"}</Typography>
+                      <Typography sx={{ color: "text.secondary", fontSize: 13 }}>
+                        {item.roll_no || "-"}
+                      </Typography>
+                    </Box>
+                    <Typography sx={{ fontWeight: 700, color: "#1a56db" }}>
+                      {formatMinutes(item.minutes_spent || 0)}
+                    </Typography>
+                  </Box>
+                ))
+              )}
+            </Stack>
+          </Paper>
 
           <Paper sx={sectionCardSx(theme)}>
             <Typography sx={sectionTitleSx}>Filters</Typography>
@@ -1495,6 +1628,15 @@ const uploadedIconWrapSx = {
   flexShrink: 0
 };
 
+const rowInfoSx = (theme) => ({
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  p: 1.5,
+  borderRadius: 3,
+  background: theme.palette.mode === "dark" ? "rgba(148, 163, 184, 0.08)" : "#f8fafc"
+});
+
 const fileNameSx = {
   fontSize: 14,
   fontWeight: 700,
@@ -1661,6 +1803,20 @@ const activePaginationButtonSx = {
     background: "#1648c0"
   }
 };
+
+function formatMinutes(minutes) {
+  const total = Number(minutes || 0);
+  if (total <= 0) return "0m";
+
+  const hours = Math.floor(total / 60);
+  const mins = total % 60;
+
+  if (hours > 0) {
+    return `${hours}h ${mins}m`;
+  }
+
+  return `${mins}m`;
+}
 
 function formatFileSize(size) {
   if (!size) return "0 KB";
