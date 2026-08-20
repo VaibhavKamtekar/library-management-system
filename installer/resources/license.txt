@@ -1,0 +1,25 @@
+============================================================
+NMITD LIBRARY MANAGEMENT SYSTEM (v1.0.0)
+OPERATIONAL & INSTALLATION NOTICE
+============================================================
+
+System Name: NMITD Library Management System
+Target Environment: Windows Desktop / Library PC
+Deployment Type: On-Premises Standalone / Local Network Service
+
+OPERATIONAL NOTICE:
+1. This software is designed for local desktop deployment at the
+   Navinchandra Mehta Institute of Technology and Development (NMITD).
+
+2. All student attendance records, visit logs, sports logs, and system
+   data remain strictly stored in the local MySQL database on this PC.
+   No data is transmitted to external remote servers.
+
+3. System services, database backups, and scheduled maintenance scripts
+   run locally under the installed application directory.
+
+4. Software components:
+   - Frontend: React JS (Production Build)
+   - Backend: Node.js + Express
+   - Database: MySQL Server
+============================================================

@@ -1,0 +1,50 @@
+# Environment files (contain credentials)
+.env
+Backend/.env
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Frontend build output (regenerated via npm run build)
+frontend/build/
+
+# Database backups (contain user data)
+backups/
+
+# Runtime logs
+logs/
+*.log
+
+# Release binaries
+releases/
+
+# Scratch / temp files
+scratch/
+
+# Installer bundled binaries
+installer/node/
+installer/resources/nssm.exe
+
+# OS-generated files
+Thumbs.db
+.DS_Store
+
+# Editor directories
+.vscode/
+.idea/
+
+# Agent / AI tool working directories
+.agents/
+graphify-out/
+
+# Unused large asset (not referenced by the app)
+frontend/src/assets/intro.mp4
+
+# Runtime upload files (user-uploaded Excel files)
+Backend/uploads/*.xlsx
+Backend/uploads/*.csv
+
+# SQL files with plaintext credentials in seed data
+database/nmitdlibrarysqlcode.sql
+nmitlibrary.txt
